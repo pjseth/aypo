@@ -1,0 +1,77 @@
+[project]
+name = "aypo-api"
+version = "0.1.0"
+description = "AYPO research engine: automated collection, multimodal analysis and evidence-backed intelligence"
+requires-python = ">=3.12"
+dependencies = [
+    # web
+    "fastapi>=0.118",
+    "uvicorn[standard]>=0.37",
+    "python-multipart>=0.0.20",
+    # config & validation
+    "pydantic>=2.11",
+    "pydantic-settings>=2.11",
+    "orjson>=3.11",
+    # db
+    "asyncpg>=0.30",
+    "pgvector>=0.4",
+    # http
+    "httpx>=0.28",
+    "tenacity>=9.1",
+    # AI providers
+    "anthropic>=0.80",
+    "openai>=2.6",
+    # analytics
+    "numpy>=2.2",
+    "pandas>=2.3",
+    "scikit-learn>=1.6",
+    "scipy>=1.15",
+    "rapidfuzz>=3.14",
+    # storage
+    "boto3>=1.40",
+    # auth
+    "pyjwt[crypto]>=2.10",
+    # observability
+    "structlog>=25.4",
+]
+
+[project.optional-dependencies]
+# Optional non-linear dimensionality reduction. Pulls numba, which is the
+# heaviest dependency in the project; the clustering pipeline falls back to
+# PCA when this is not installed.
+umap = ["umap-learn>=0.5.7"]
+# Alternative multimodal provider (native video input).
+gemini = ["google-genai>=1.20"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4",
+    "pytest-asyncio>=1.0",
+    "ruff>=0.14",
+    "respx>=0.22",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "RUF"]
+ignore = ["B008", "RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+# The analysis prompt is prose, and its bytes must stay stable for prompt
+# caching. Reflowing it to satisfy a line-length rule would invalidate the
+# cache on the highest-volume stage in the pipeline.
+"aypo/analysis/prompt.py" = ["E501"]
+
+[tool.pytest.ini_options]
+# The project is not installed into the venv (tool.uv package = false), so
+# tests import it from the source tree.
+pythonpath = ["."]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.uv]
+package = false

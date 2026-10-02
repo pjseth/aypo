@@ -1,0 +1,260 @@
+@import "tailwindcss";
+
+/* ──────────────────────────────────────────────────────────────────────────
+   AYPO design tokens.
+
+   Brief §33 asks for an enterprise intelligence platform: analytical,
+   evidence-first, minimal decoration, strong hierarchy, credible. So the
+   palette is deliberately restrained — one accent, a wide neutral ramp for
+   data density, and semantic colour reserved for things that carry meaning.
+
+   Two token families are load-bearing rather than cosmetic:
+
+   * claim-*       how a statement was arrived at (observed / computed /
+                   interpreted / hypothesis). Brief §3 requires these be
+                   distinguishable, so they get colour AND border style.
+   * confidence-*  how much the evidence supports it, including an explicit
+                   "insufficient" state, because brief §28 requires the product
+                   to say when the data is too weak rather than stay silent.
+
+   Colour is never the only carrier: every badge pairs it with a label, so the
+   distinction survives greyscale printing and colour-vision deficiency.
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --bg: #fbfbfc;
+  --panel: #ffffff;
+  --elevated: #ffffff;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+
+  --text: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --text-faint: #a1a1aa;
+
+  --accent: #4338ca;
+  --accent-hover: #3730a3;
+  --accent-subtle: #eef2ff;
+  --accent-text: #ffffff;
+
+  /* How a claim was arrived at (brief §3). */
+  --claim-observed: #0e7490;      /* directly in the data   */
+  --claim-computed: #4f46e5;      /* calculated by code     */
+  --claim-interpreted: #b45309;   /* model interpretation   */
+  --claim-hypothesis: #86198f;    /* needs investigation    */
+
+  /* How well evidence supports it (brief §28). */
+  --confidence-high: #15803d;
+  --confidence-moderate: #a16207;
+  --confidence-low: #c2410c;
+  --confidence-insufficient: #71717a;
+
+  /* Trend state (brief §22). Never implies "good" or "bad" — a declining
+     theme is as actionable as a growing one. */
+  --trend-growing: #047857;
+  --trend-emerging: #0369a1;
+  --trend-established: #475569;
+  --trend-stable: #57534e;
+  --trend-declining: #9f1239;
+  --trend-weak: #a1a1aa;
+
+  --danger: #b91c1c;
+  --warning: #a16207;
+
+  --chart-1: #4f46e5;
+  --chart-2: #0891b2;
+  --chart-3: #c2410c;
+  --chart-4: #65a30d;
+  --chart-5: #9333ea;
+  --chart-6: #be123c;
+
+  --radius: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #09090b;
+    --panel: #121214;
+    --elevated: #19191d;
+    --border: #27272a;
+    --border-strong: #3f3f46;
+
+    --text: #fafafa;
+    --text-secondary: #a1a1aa;
+    --text-muted: #8b8b94;
+    --text-faint: #6b6b75;
+
+    --accent: #818cf8;
+    --accent-hover: #a5b4fc;
+    --accent-subtle: #1e1b4b;
+    --accent-text: #0b0b11;
+
+    --claim-observed: #22d3ee;
+    --claim-computed: #a5b4fc;
+    --claim-interpreted: #fbbf24;
+    --claim-hypothesis: #e879f9;
+
+    --confidence-high: #4ade80;
+    --confidence-moderate: #fbbf24;
+    --confidence-low: #fb923c;
+    --confidence-insufficient: #8b8b94;
+
+    --trend-growing: #34d399;
+    --trend-emerging: #38bdf8;
+    --trend-established: #94a3b8;
+    --trend-stable: #a8a29e;
+    --trend-declining: #fb7185;
+    --trend-weak: #71717a;
+
+    --danger: #f87171;
+    --warning: #fbbf24;
+
+    --chart-1: #818cf8;
+    --chart-2: #22d3ee;
+    --chart-3: #fb923c;
+    --chart-4: #a3e635;
+    --chart-5: #c084fc;
+    --chart-6: #fb7185;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #09090b;
+  --panel: #121214;
+  --elevated: #19191d;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --text: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #8b8b94;
+  --text-faint: #6b6b75;
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
+  --accent-subtle: #1e1b4b;
+  --accent-text: #0b0b11;
+  --claim-observed: #22d3ee;
+  --claim-computed: #a5b4fc;
+  --claim-interpreted: #fbbf24;
+  --claim-hypothesis: #e879f9;
+  --confidence-high: #4ade80;
+  --confidence-moderate: #fbbf24;
+  --confidence-low: #fb923c;
+  --confidence-insufficient: #8b8b94;
+  --trend-growing: #34d399;
+  --trend-emerging: #38bdf8;
+  --trend-established: #94a3b8;
+  --trend-stable: #a8a29e;
+  --trend-declining: #fb7185;
+  --trend-weak: #71717a;
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --chart-1: #818cf8;
+  --chart-2: #22d3ee;
+  --chart-3: #fb923c;
+  --chart-4: #a3e635;
+  --chart-5: #c084fc;
+  --chart-6: #fb7185;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-elevated: var(--elevated);
+  --color-border-subtle: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-text: var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-accent-text: var(--accent-text);
+
+  --color-claim-observed: var(--claim-observed);
+  --color-claim-computed: var(--claim-computed);
+  --color-claim-interpreted: var(--claim-interpreted);
+  --color-claim-hypothesis: var(--claim-hypothesis);
+
+  --color-confidence-high: var(--confidence-high);
+  --color-confidence-moderate: var(--confidence-moderate);
+  --color-confidence-low: var(--confidence-low);
+  --color-confidence-insufficient: var(--confidence-insufficient);
+
+  --color-trend-growing: var(--trend-growing);
+  --color-trend-emerging: var(--trend-emerging);
+  --color-trend-established: var(--trend-established);
+  --color-trend-stable: var(--trend-stable);
+  --color-trend-declining: var(--trend-declining);
+  --color-trend-weak: var(--trend-weak);
+
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --radius-card: var(--radius);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Tabular figures by default: this UI is full of counts and sample sizes
+     that must not jitter between renders. */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numbers in prose should still read naturally. */
+.prose-numeric {
+  font-variant-numeric: normal;
+}
+
+::selection {
+  background: var(--accent-subtle);
+  color: var(--text);
+}
+
+/* Visible focus for keyboard users; this is a dense, keyboard-driven tool. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Scrollbars: present but quiet, so dense panels stay legible. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}

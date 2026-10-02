@@ -1,0 +1,70 @@
+[
+ {
+  "id": "7000000000000000001",
+  "text": "showing the Brand A pack I picked up #themex",
+  "textLanguage": "en",
+  "createTimeISO": "2026-01-15T08:30:00.000Z",
+  "createTime": 1768465800,
+  "webVideoUrl": "https://www.tiktok.com/@creator_one/video/7000000000000000001",
+  "searchQuery": "category query x",
+  "isAd": false,
+  "isSponsored": true,
+  "isSlideshow": false,
+  "isPinned": false,
+  "playCount": 123456,
+  "diggCount": 7890,
+  "commentCount": 123,
+  "shareCount": 45,
+  "collectCount": 678,
+  "repostCount": 0,
+  "hashtags": [
+   {
+    "name": "themex"
+   },
+   {
+    "name": "categoryy"
+   }
+  ],
+  "mediaUrls": [],
+  "relatedSearchWords": [
+   "related term one",
+   "related term two"
+  ],
+  "authorMeta": {
+   "id": "99000",
+   "name": "creator_one",
+   "nickName": "Creator One",
+   "fans": 4259,
+   "following": 310,
+   "video": 649,
+   "heart": 69000,
+   "verified": false,
+   "signature": "bio line",
+   "profileUrl": "https://www.tiktok.com/@creator_one",
+   "avatar": "https://example.invalid/avatar.jpg"
+  },
+  "musicMeta": {
+   "musicId": "700111",
+   "musicName": "Sound Z",
+   "musicAuthor": "Author Q",
+   "musicOriginal": false,
+   "playUrl": "https://example.invalid/sound.mp3"
+  },
+  "videoMeta": {
+   "duration": 14,
+   "width": 1080,
+   "height": 1920,
+   "coverUrl": "https://example.invalid/cover.jpg",
+   "originalCoverUrl": "https://example.invalid/cover-orig.jpg",
+   "transcriptionLink": null,
+   "subtitleLinks": null,
+   "aiVideoDescription": null,
+   "aiVideoSummary": null
+  }
+ },
+ {
+  "id": "",
+  "webVideoUrl": null,
+  "authorMeta": {}
+ }
+]

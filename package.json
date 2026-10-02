@@ -1,0 +1,18 @@
+{
+  "name": "aypo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Social, cultural, competitive and commerce intelligence for Southeast Asia",
+  "scripts": {
+    "dev": "pnpm --filter aypo-web dev",
+    "build": "pnpm --filter aypo-web build",
+    "lint": "pnpm --filter aypo-web lint",
+    "typecheck": "pnpm --filter aypo-web exec tsc --noEmit",
+    "api": "cd apps/api && uv run uvicorn aypo.main:app --reload --port ${AYPO_API_PORT:-8000}",
+    "worker": "cd apps/api && uv run python -m aypo.jobs.worker",
+    "api:test": "cd apps/api && uv run pytest -q",
+    "api:lint": "cd apps/api && uv run ruff check . && uv run ruff format --check .",
+    "db:migrate": "cd apps/api && uv run python -m aypo.db.migrate"
+  },
+  "packageManager": "pnpm@10.18.0"
+}
