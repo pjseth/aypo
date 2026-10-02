@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Snack Launch Radar</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --neutral-bar: #9e9c95; --accent-wash: rgba(42,120,214,0.08);
+  --good: #006300; --bad: #b42f2f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --neutral-bar: #6b6a64; --accent-wash: rgba(57,135,229,0.12);
+    --good: #0ca30c; --bad: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --neutral-bar: #6b6a64; --accent-wash: rgba(57,135,229,0.12);
+  --good: #0ca30c; --bad: #e66767;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+header h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; }
+header p { margin: 0; color: var(--ink-2); }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 20px 0 16px;
+  position: sticky; top: 0; background: var(--page); padding: 10px 0; z-index: 5; }
+.filters label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-2); }
+select, input[type=search] { font: inherit; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; min-height: 34px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: inherit; border: 0; background: transparent; color: var(--ink-2); padding: 6px 12px; cursor: pointer; min-height: 34px; }
+.seg button[aria-pressed="true"] { background: var(--accent-wash); color: var(--ink); font-weight: 600; }
+.theme-btn { margin-left: auto; }
+.grid { display: grid; gap: 16px; }
+.tiles { grid-template-columns: repeat(4, 1fr); }
+.two { grid-template-columns: 1fr 1fr; }
+@media (max-width: 860px) { .tiles { grid-template-columns: 1fr 1fr; } .two { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.card h2 { font-size: 15px; margin: 0 0 2px; font-weight: 620; }
+.card .sub { color: var(--ink-2); font-size: 12.5px; margin: 0 0 12px; }
+.tile .label { color: var(--ink-2); font-size: 12.5px; }
+.tile .value { font-size: 30px; font-weight: 620; margin: 2px 0; }
+.tile .delta { font-size: 12.5px; color: var(--ink-2); }
+.up { color: var(--good); } .down { color: var(--bad); }
+section { margin-top: 16px; }
+.insights { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.insight .chip { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase;
+  color: var(--ink-2); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; margin-bottom: 6px; }
+.insight h3 { font-size: 14px; margin: 0 0 4px; font-weight: 600; }
+.insight p { margin: 0; color: var(--ink-2); font-size: 13px; }
+svg { display: block; width: 100%; overflow: visible; }
+svg text { fill: var(--muted); font-size: 11px; }
+svg .lbl { fill: var(--ink-2); font-size: 12px; }
+svg .val { fill: var(--ink); font-size: 12px; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 8px; font-size: 12.5px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.legend i.tick { width: 2px; height: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th { color: var(--ink-2); font-weight: 600; font-size: 12px; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.client td { background: var(--accent-wash); }
+.table-scroll { overflow-x: auto; }
+.feed-tools { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.feed-tools input { flex: 1 1 220px; }
+.kind { font-size: 11.5px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; white-space: nowrap; color: var(--ink-2); }
+.kind.New { color: var(--ink); font-weight: 600; }
+button.more { font: inherit; margin-top: 10px; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+details { margin-top: 8px; color: var(--ink-2); font-size: 12.5px; }
+.tip { position: fixed; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 20; display: none; max-width: 280px; }
+.tip b { font-weight: 600; }
+.tip .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.tip i { width: 10px; height: 3px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+.notes { color: var(--ink-2); font-size: 12.5px; }
+.notes li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Snack Launch Radar · Philippines</h1>
+    <p id="meta"></p>
+  </header>
+
+  <div class="filters" role="group" aria-label="Filters">
+    <label>Period
+      <span class="seg" id="period">
+        <button data-m="3">3 mo</button><button data-m="6">6 mo</button><button data-m="12">12 mo</button><button data-m="24">24 mo</button>
+      </span>
+    </label>
+    <label>Snack type <select id="ftype"></select></label>
+    <label>Company type
+      <select id="fctype"><option>All</option><option>Manufacturer / brand owner</option><option>Importer / retailer</option></select>
+    </label>
+    <label class="theme-btn">Theme
+      <span class="seg" id="theme"><button data-t="light">Light</button><button data-t="dark">Dark</button></span>
+    </label>
+  </div>
+
+  <div class="grid tiles" id="tiles"></div>
+
+  <section>
+    <div class="grid insights" id="insights"></div>
+  </section>
+
+  <section class="card">
+    <h2 id="qtitle">New snack products per quarter</h2>
+    <p class="sub">First-time FDA registrations (renewals and amendments excluded), main snack makers. Quarters through the last full quarter.</p>
+    <div class="legend" id="qlegend"></div>
+    <div id="qchart"></div>
+    <details><summary>Show data</summary><div class="table-scroll" id="qtable"></div></details>
+  </section>
+
+  <section class="card">
+    <h2>All companies: new snack products per quarter</h2>
+    <p class="sub">Every company, including importers and retailers registering imported brands.</p>
+    <div id="mchart"></div>
+  </section>
+
+  <section class="grid two">
+    <div class="card">
+      <h2>Snack types: where new products are going</h2>
+      <p class="sub" id="typesub"></p>
+      <div class="legend"><span><i style="background:var(--neutral-bar)"></i>Selected period</span><span><i class="tick" style="background:var(--ink)"></i>Prior period</span></div>
+      <div id="types"></div>
+    </div>
+    <div class="card">
+      <h2>Flavours: what's being pushed</h2>
+      <p class="sub" id="flavsub"></p>
+      <div class="legend"><span><i style="background:var(--neutral-bar)"></i>Selected period</span><span><i class="tick" style="background:var(--ink)"></i>Prior period</span></div>
+      <div id="flavours"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Competitors</h2>
+    <p class="sub" id="compsub"></p>
+    <div class="table-scroll" id="comp"></div>
+  </section>
+
+  <section class="card">
+    <h2>Registration feed</h2>
+    <p class="sub">Every snack registration, newest first. "New" is a first-time registration; the rest are renewals, amendments, re-applications and cancellation requests.</p>
+    <div class="feed-tools">
+      <input type="search" id="q" placeholder="Search brand, product or company" aria-label="Search registrations">
+      <select id="fkind" aria-label="Application type"><option>All</option><option>New</option><option>Renewal</option><option>Amendment</option><option>Re-application</option><option>Cancellation</option></select>
+    </div>
+    <div class="table-scroll" id="feed"></div>
+    <button class="more" id="more">Show 50 more</button>
+  </section>
+
+  <section class="card notes">
+    <h2>About this data</h2>
+    <ul id="notes"></ul>
+  </section>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const D = /*__DATA__*/null;
+const SLOTS = ['--s1', '--s2', '--s3', '--s4', '--s5'];
+const colorOf = g => { const i = D.highlight.indexOf(g); return i >= 0 ? `var(${SLOTS[i]})` : 'var(--neutral-bar)'; };
+const state = { months: 12, type: 'All', ctype: 'All', q: '', kind: 'All', shown: 50 };
+const fmt = n => n.toLocaleString('en-US');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const title = s => esc(String(s || '').toLowerCase().replace(/(^|[\s(\-/'])([a-z])/g, (m, a, b) => a + b.toUpperCase()));
+
+function monthsBefore(iso, m) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setMonth(d.getMonth() - m);
+  return d.toISOString().slice(0, 10);
+}
+function quarterOf(iso) { const y = +iso.slice(0, 4), q = Math.floor((+iso.slice(5, 7) - 1) / 3) + 1; return `${y}-Q${q}`; }
+function quarters() {
+  const out = [], last = quarterOf(D.as_of);
+  let y = +D.history_start.slice(0, 4), q = 1;
+  while (`${y}-Q${q}` !== last) { out.push(`${y}-Q${q}`); q++; if (q > 4) { q = 1; y++; } }
+  return out; // excludes the current, partial quarter
+}
+const qLabel = k => `Q${k.slice(-1)} '${k.slice(2, 4)}`;
+
+function filtered() {
+  return D.products.filter(p => (state.type === 'All' || p.t === state.type) && (state.ctype === 'All' || p.ct === state.ctype));
+}
+function windows() { const a0 = monthsBefore(D.as_of, state.months), b0 = monthsBefore(D.as_of, 2 * state.months); return { a0, b0 }; }
+
+// ---------- tooltip ----------
+const tip = document.getElementById('tip');
+function showTip(html, ev) {
+  tip.innerHTML = html; tip.style.display = 'block';
+  const r = tip.getBoundingClientRect();
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+const hideTip = () => { tip.style.display = 'none'; };
+
+function niceMax(v) { if (v <= 5) return 5; const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p; return 10 * p; }
+const svgEl = (w, h, inner, label) => `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="${esc(label)}">${inner}</svg>`;
+
+// ---------- tiles ----------
+function renderTiles(P) {
+  const { a0, b0 } = windows();
+  const nw = P.filter(p => p.s === 'New');
+  const cur = nw.filter(p => p.d >= a0), prev = nw.filter(p => p.d >= b0 && p.d < a0);
+  const delta = (a, b) => b ? Math.round(100 * (a - b) / b) : null;
+  const dtxt = (a, b) => { const d = delta(a, b); if (d === null) return 'no prior data'; const cls = d > 0 ? 'up' : d < 0 ? 'down' : ''; return `<span class="${cls}">${d > 0 ? '+' : ''}${d}%</span> vs prior ${state.months} mo (${fmt(b)})`; };
+  const companies = new Set(cur.map(p => p.g)).size, companiesPrev = new Set(prev.map(p => p.g)).size;
+  const imp = cur.filter(p => p.ct === 'Importer / retailer').length;
+  const impPrev = prev.filter(p => p.ct === 'Importer / retailer').length;
+  const mine = cur.filter(p => p.g === D.client).length, minePrev = prev.filter(p => p.g === D.client).length;
+  const rank = Object.entries(cur.reduce((a, p) => (a[p.g] = (a[p.g] || 0) + 1, a), {})).sort((a, b) => b[1] - a[1]).findIndex(e => e[0] === D.client) + 1;
+  const tiles = [
+    ['New snack products', fmt(cur.length), dtxt(cur.length, prev.length)],
+    ['Companies launching', fmt(companies), dtxt(companies, companiesPrev)],
+    ['Share from importers / retailers', cur.length ? Math.round(100 * imp / cur.length) + '%' : '–', prev.length ? `was ${Math.round(100 * impPrev / prev.length)}% in prior ${state.months} mo` : 'no prior data'],
+    [`${D.client} new snack products`, fmt(mine), (rank ? `rank #${rank} of ${companies} · ` : '') + dtxt(mine, minePrev)],
+  ];
+  document.getElementById('tiles').innerHTML = tiles.map(([l, v, d]) =>
+    `<div class="card tile"><div class="label">${esc(l)}</div><div class="value">${v}</div><div class="delta">${d}</div></div>`).join('');
+}
+
+// ---------- insights ----------
+function renderInsights() {
+  document.getElementById('insights').innerHTML = D.insights.map(i =>
+    `<div class="card insight"><span class="chip">${esc(i.kind)}</span><h3>${esc(i.title)}</h3><p>${esc(i.body)}</p></div>`).join('') +
+    `<div class="card insight"><span class="chip">How to read</span><h3>Leads, not conclusions</h3><p>Insights compare the last 12 months with the 12 before, whatever filters are set. A registration shows what a competitor is preparing, not what is selling.</p></div>`;
+}
+
+// ---------- quarterly lines ----------
+function renderQuarterLines(P) {
+  const Q = quarters();
+  const series = D.highlight.map(g => ({ g, v: Q.map(q => P.filter(p => p.s === 'New' && p.g === g && quarterOf(p.d) === q).length) }));
+  document.getElementById('qlegend').innerHTML = series.map(s => `<span><i style="background:${colorOf(s.g)}"></i>${esc(s.g)}</span>`).join('');
+  const el = document.getElementById('qchart');
+  const W = Math.max(260, el.clientWidth), H = 280, m = { l: 34, r: 128, t: 12, b: 26 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const ymax = niceMax(Math.max(1, ...series.flatMap(s => s.v)));
+  const x = i => m.l + (Q.length === 1 ? iw / 2 : i * iw / (Q.length - 1)), y = v => m.t + ih - v / ymax * ih;
+  let g = '';
+  for (let k = 0; k <= 4; k++) { const v = ymax * k / 4, yy = y(v); g += `<line x1="${m.l}" x2="${m.l + iw}" y1="${yy}" y2="${yy}" stroke="var(--grid)"/><text x="${m.l - 6}" y="${yy + 4}" text-anchor="end">${fmt(Math.round(v))}</text>`; }
+  Q.forEach((q, i) => { if (q.endsWith('Q1')) g += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${q.slice(0, 4)}</text>`; });
+  g += `<line x1="${m.l}" x2="${m.l + iw}" y1="${m.t + ih}" y2="${m.t + ih}" stroke="var(--axis)"/>`;
+  // draw client last so it sits on top
+  const order = series.slice(1).concat(series.slice(0, 1));
+  order.forEach(s => {
+    const d = s.v.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+    g += `<path d="${d}" fill="none" stroke="${colorOf(s.g)}" stroke-width="${s.g === D.client ? 2.5 : 2}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const li = s.v.length - 1;
+    g += `<circle cx="${x(li)}" cy="${y(s.v[li])}" r="4" fill="${colorOf(s.g)}" stroke="var(--surface)" stroke-width="2"/>`;
+  });
+  // end labels with simple collision check
+  // direct end labels only when they don't collide; otherwise the legend + tooltip carry identity
+  const ends = series.map(s => ({ g: s.g, v: s.v[s.v.length - 1], y: y(s.v[s.v.length - 1]) })).sort((a, b) => a.y - b.y);
+  const collide = ends.some((e, i) => i && e.y - ends[i - 1].y < 14);
+  if (!collide) ends.forEach(e => { g += `<text class="lbl" x="${m.l + iw + 8}" y="${e.y + 4}">${esc(e.g.length > 16 ? e.g.slice(0, 15) + '…' : e.g)} ${e.v}</text>`; });
+  g += `<line id="xh" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" stroke="var(--axis)" visibility="hidden"/>`;
+  g += `<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" id="qhit"/>`;
+  el.innerHTML = svgEl(W, H, g, 'New snack products per quarter by company');
+  const hit = el.querySelector('#qhit'), xh = el.querySelector('#xh');
+  hit.addEventListener('mousemove', ev => {
+    const r = hit.getBoundingClientRect(); const i = Math.max(0, Math.min(Q.length - 1, Math.round((ev.clientX - r.left) / r.width * (Q.length - 1))));
+    xh.setAttribute('x1', x(i)); xh.setAttribute('x2', x(i)); xh.setAttribute('visibility', 'visible');
+    const rows = series.slice().sort((a, b) => b.v[i] - a.v[i]).map(s => `<div class="row"><span><i style="background:${colorOf(s.g)}"></i>${esc(s.g)}</span><b>${s.v[i]}</b></div>`).join('');
+    showTip(`<b>${qLabel(Q[i]).replace("'", '20')}</b>${rows}`, ev);
+  });
+  hit.addEventListener('mouseleave', () => { hideTip(); xh.setAttribute('visibility', 'hidden'); });
+  document.getElementById('qtable').innerHTML = `<table><thead><tr><th>Quarter</th>${series.map(s => `<th class="num">${esc(s.g)}</th>`).join('')}</tr></thead><tbody>` +
+    Q.map((q, i) => `<tr><td>${q}</td>${series.map(s => `<td class="num">${s.v[i]}</td>`).join('')}</tr>`).join('') + '</tbody></table>';
+}
+
+// ---------- market columns ----------
+function renderMarket(P) {
+  const Q = quarters();
+  const v = Q.map(q => P.filter(p => p.s === 'New' && quarterOf(p.d) === q).length);
+  const el = document.getElementById('mchart');
+  const W = Math.max(260, el.clientWidth), H = 200, m = { l: 34, r: 8, t: 16, b: 26 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b, band = iw / Q.length, bw = Math.min(24, band * 0.6);
+  const ymax = niceMax(Math.max(1, ...v)), y = val => m.t + ih - val / ymax * ih;
+  let g = '';
+  for (let k = 0; k <= 4; k++) { const val = ymax * k / 4, yy = y(val); g += `<line x1="${m.l}" x2="${m.l + iw}" y1="${yy}" y2="${yy}" stroke="var(--grid)"/><text x="${m.l - 6}" y="${yy + 4}" text-anchor="end">${fmt(Math.round(val))}</text>`; }
+  Q.forEach((q, i) => {
+    const cx = m.l + band * i + band / 2, top = y(v[i]), h = m.t + ih - top, r = Math.min(4, h);
+    if (h > 0) g += `<path d="M${cx - bw / 2},${m.t + ih}V${top + r}Q${cx - bw / 2},${top} ${cx - bw / 2 + r},${top}H${cx + bw / 2 - r}Q${cx + bw / 2},${top} ${cx + bw / 2},${top + r}V${m.t + ih}Z" fill="var(--neutral-bar)"/>`;
+    g += `<rect x="${cx - band / 2}" y="${m.t}" width="${band}" height="${ih}" fill="transparent" data-i="${i}" class="mhit"/>`;
+    if (q.endsWith('Q1')) g += `<text x="${cx}" y="${H - 6}" text-anchor="middle">${q.slice(0, 4)}</text>`;
+  });
+  const li = v.length - 1;
+  g += `<text class="val" x="${m.l + band * li + band / 2}" y="${y(v[li]) - 6}" text-anchor="middle">${v[li]}</text>`;
+  g += `<line x1="${m.l}" x2="${m.l + iw}" y1="${m.t + ih}" y2="${m.t + ih}" stroke="var(--axis)"/>`;
+  el.innerHTML = svgEl(W, H, g, 'All companies: new snack products per quarter');
+  el.querySelectorAll('.mhit').forEach(r => {
+    r.addEventListener('mousemove', ev => { const i = +r.dataset.i; showTip(`<b>${Q[i]}</b><div class="row"><span>New snack products</span><b>${v[i]}</b></div>`, ev); });
+    r.addEventListener('mouseleave', hideTip);
+  });
+}
+
+// ---------- horizontal momentum bars ----------
+function momentum(P, keyFn, limit) {
+  const { a0, b0 } = windows();
+  const cur = {}, prev = {}, mine = {};
+  P.filter(p => p.s === 'New').forEach(p => {
+    const keys = keyFn(p);
+    if (p.d >= a0) keys.forEach(k => { cur[k] = (cur[k] || 0) + 1; if (p.g === D.client) mine[k] = (mine[k] || 0) + 1; });
+    else if (p.d >= b0) keys.forEach(k => { prev[k] = (prev[k] || 0) + 1; });
+  });
+  return Object.keys({ ...cur, ...prev }).map(k => ({ k, c: cur[k] || 0, p: prev[k] || 0, m: mine[k] || 0 }))
+    .sort((a, b) => b.c - a.c).slice(0, limit);
+}
+function renderBars(elId, rows, showMine) {
+  const el = document.getElementById(elId);
+  const W = Math.max(260, el.clientWidth), rowH = 30, m = { l: 168, r: showMine ? 150 : 84, t: 4, b: 4 };
+  const H = m.t + m.b + rows.length * rowH, iw = W - m.l - m.r;
+  const xmax = niceMax(Math.max(1, ...rows.map(r => Math.max(r.c, r.p)))), x = v => m.l + v / xmax * iw;
+  let g = '';
+  rows.forEach((r, i) => {
+    const yc = m.t + i * rowH + rowH / 2, bh = 14, w = x(r.c) - m.l, rr = Math.min(4, w);
+    const name = r.k.length > 26 ? r.k.slice(0, 25) + '…' : r.k;
+    g += `<text class="lbl" x="${m.l - 8}" y="${yc + 4}" text-anchor="end">${esc(name)}</text>`;
+    if (w > 0) g += `<path d="M${m.l},${yc - bh / 2}H${m.l + w - rr}Q${m.l + w},${yc - bh / 2} ${m.l + w},${yc - bh / 2 + rr}V${yc + bh / 2 - rr}Q${m.l + w},${yc + bh / 2} ${m.l + w - rr},${yc + bh / 2}H${m.l}Z" fill="var(--neutral-bar)"/>`;
+    g += `<line x1="${x(r.p)}" x2="${x(r.p)}" y1="${yc - 10}" y2="${yc + 10}" stroke="var(--ink)" stroke-width="2"/>`;
+    const d = r.p ? Math.round(100 * (r.c - r.p) / r.p) : null;
+    g += `<text class="val" x="${m.l + iw + 8}" y="${yc + 4}">${r.c}${d === null ? (r.c ? ' new' : '') : ` (${d > 0 ? '+' : ''}${d}%)`}</text>`;
+    if (showMine) g += `<text class="lbl" x="${W - 4}" y="${yc + 4}" text-anchor="end">${esc(D.client)} ${r.m}</text>`;
+    g += `<rect x="0" y="${yc - rowH / 2}" width="${W}" height="${rowH}" fill="transparent" class="bhit" data-i="${i}"/>`;
+  });
+  el.innerHTML = rows.length ? svgEl(W, H, g, elId) : '<p class="sub">No new products in this selection.</p>';
+  el.querySelectorAll('.bhit').forEach(h => {
+    h.addEventListener('mousemove', ev => { const r = rows[+h.dataset.i]; showTip(`<b>${esc(r.k)}</b><div class="row"><span>Selected period</span><b>${r.c}</b></div><div class="row"><span>Prior period</span><b>${r.p}</b></div><div class="row"><span>${esc(D.client)} (selected)</span><b>${r.m}</b></div>`, ev); });
+    h.addEventListener('mouseleave', hideTip);
+  });
+}
+
+// ---------- competitor table ----------
+function renderCompetitors(P) {
+  const { a0, b0 } = windows();
+  const by = {};
+  P.filter(p => p.s === 'New' && p.d >= b0).forEach(p => {
+    const o = by[p.g] || (by[p.g] = { g: p.g, ct: p.ct, c: 0, p: 0, types: {}, fl: {}, last: '' });
+    if (p.d >= a0) { o.c++; o.types[p.t] = (o.types[p.t] || 0) + 1; p.f.forEach(f => o.fl[f] = (o.fl[f] || 0) + 1); if (p.d > o.last) o.last = p.d; }
+    else o.p++;
+  });
+  const top = (obj, n) => Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, n).map(e => esc(e[0])).join(', ') || '–';
+  const rows = Object.values(by).filter(o => o.c > 0).sort((a, b) => b.c - a.c).slice(0, 20);
+  if (!rows.some(r => r.g === D.client) && by[D.client]) rows.push(by[D.client]);
+  document.getElementById('compsub').textContent = `Top companies by new snack products in the last ${state.months} months, versus the ${state.months} months before.`;
+  document.getElementById('comp').innerHTML = `<table><thead><tr><th>Company</th><th>Type</th><th class="num">New</th><th class="num">Prior</th><th class="num">Change</th><th>Main snack types</th><th>Main flavours</th><th>Latest new</th></tr></thead><tbody>` +
+    rows.map(o => { const d = o.p ? Math.round(100 * (o.c - o.p) / o.p) : null; return `<tr class="${o.g === D.client ? 'client' : ''}"><td>${esc(o.g)}</td><td>${o.ct === 'Importer / retailer' ? 'Importer / retailer' : 'Maker'}</td><td class="num">${o.c}</td><td class="num">${o.p}</td><td class="num ${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${d === null ? '–' : (d > 0 ? '+' : '') + d + '%'}</td><td>${top(o.types, 2)}</td><td>${top(o.fl, 3)}</td><td>${o.last || '–'}</td></tr>`; }).join('') + '</tbody></table>';
+}
+
+// ---------- feed ----------
+function renderFeed() {
+  const q = state.q.trim().toLowerCase();
+  const rows = D.regs.filter(r => (state.type === 'All' || r.t === state.type) && (state.ctype === 'All' || r.ct === state.ctype) &&
+    (state.kind === 'All' || r.k === state.kind) && (!q || (r.b + ' ' + r.p + ' ' + r.g).toLowerCase().includes(q)));
+  document.getElementById('feed').innerHTML = `<table><thead><tr><th>Date</th><th>Type</th><th>Company</th><th>Brand</th><th>Product</th><th>Snack type</th><th>Reg. no.</th></tr></thead><tbody>` +
+    rows.slice(0, state.shown).map(r => `<tr class="${r.g === D.client ? 'client' : ''}"><td style="white-space:nowrap">${r.d}</td><td><span class="kind ${esc(r.k)}">${esc(r.k)}</span></td><td>${esc(r.g)}</td><td>${title(r.b)}</td><td>${title(r.p)}</td><td>${esc(r.t)}</td><td style="white-space:nowrap">${esc(r.c)}</td></tr>`).join('') + '</tbody></table>' +
+    `<p class="sub" style="margin-top:8px">${fmt(Math.min(state.shown, rows.length))} of ${fmt(rows.length)} registrations</p>`;
+  document.getElementById('more').style.display = rows.length > state.shown ? '' : 'none';
+}
+
+// ---------- page ----------
+function renderAll() {
+  const P = filtered();
+  document.querySelectorAll('#period button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.m === state.months));
+  renderTiles(P);
+  renderQuarterLines(P);
+  renderMarket(P);
+  document.getElementById('typesub').textContent = `New products in the last ${state.months} months; the tick marks the ${state.months} months before.`;
+  document.getElementById('flavsub').textContent = `Top flavours in new products, last ${state.months} months. Right column: ${D.client}'s count.`;
+  renderBars('types', momentum(P, p => [p.t], 11), false);
+  renderBars('flavours', momentum(P, p => p.f, 12), true);
+  renderCompetitors(P);
+  renderFeed();
+}
+
+function init() {
+  document.getElementById('meta').textContent =
+    `FDA Philippines food registrations as of ${D.as_of} · ${fmt(D.n_food_records)} food records, ${fmt(D.n_snack_regs)} snack registrations, ${fmt(D.products.length)} snack products · data pull ${D.run_status} · built ${D.generated_at}`;
+  const types = [...new Set(D.products.map(p => p.t))].sort();
+  document.getElementById('ftype').innerHTML = ['All', ...types].map(t => `<option>${esc(t)}</option>`).join('');
+  document.getElementById('period').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { state.months = +b.dataset.m; renderAll(); } });
+  document.getElementById('ftype').addEventListener('change', e => { state.type = e.target.value; state.shown = 50; renderAll(); });
+  document.getElementById('fctype').addEventListener('change', e => { state.ctype = e.target.value; state.shown = 50; renderAll(); });
+  document.getElementById('q').addEventListener('input', e => { state.q = e.target.value; state.shown = 50; renderFeed(); });
+  document.getElementById('fkind').addEventListener('change', e => { state.kind = e.target.value; state.shown = 50; renderFeed(); });
+  document.getElementById('more').addEventListener('click', () => { state.shown += 50; renderFeed(); });
+  const themeBtns = document.querySelectorAll('#theme button');
+  const setTheme = t => { document.documentElement.setAttribute('data-theme', t); themeBtns.forEach(b => b.setAttribute('aria-pressed', b.dataset.t === t)); try { localStorage.setItem('radar-theme', t); } catch (e) {} };
+  let saved = null; try { saved = localStorage.getItem('radar-theme'); } catch (e) {}
+  const fromHash = ['#light', '#dark'].includes(location.hash) ? location.hash.slice(1) : null;
+  setTheme(fromHash || saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  document.getElementById('theme').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setTheme(b.dataset.t); });
+  document.getElementById('notes').innerHTML = [
+    'Source: public FDA Philippines verification portal (food product registrations). Every pull is stored, so changes week to week are kept.',
+    '"New snack product" = a product whose earliest registration on file is an Initial application. The same product registered at several plants, or re-filed, counts once.',
+    'Snack types, flavours and claims are tagged with transparent keyword rules on the registered product name. Expect some misses; the feed shows the raw names.',
+    'Company type is inferred from the company name (supermarkets, duty-free shops, trading and import companies count as importers / retailers).',
+    'Registrations before 2021 are sparse because older products appear under their latest renewal date. Trends are most reliable from 2022.',
+    'A registration is a signal of intent, not proof of a launch or of sales.',
+  ].map(t => `<li>${esc(t)}</li>`).join('');
+  renderInsights();
+  renderAll();
+  let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
+}
+init();
+</script>
+</body>
+</html>
