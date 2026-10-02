@@ -6,7 +6,7 @@ registering, what flavours and formats are rising, and where the client (URC) ha
 ## Run it
 
 ```bash
-cd launch_radar
+cd "AYPO Mamsir"
 python3 -m radar.collect            # pull every food registration (~30–45 min, polite pacing)
 python3 -m radar.build_dashboard    # writes dashboard/index.html
 open dashboard/index.html
