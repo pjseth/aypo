@@ -1,0 +1,1014 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wheat Procurement Desk</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --neutral-bar: #9e9c95; --accent-wash: rgba(42,120,214,0.08);
+  --div-pos: #2a78d6; --div-neg: #e34948; --div-mid: #f0efec;
+  --track: #cde2fb;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  --up: #b42f2f; --down: #006300;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --neutral-bar: #6b6a64; --accent-wash: rgba(57,135,229,0.12);
+    --div-pos: #3987e5; --div-neg: #e66767; --div-mid: #383835;
+    --track: #184f95;
+    --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+    --up: #e66767; --down: #0ca30c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --neutral-bar: #6b6a64; --accent-wash: rgba(57,135,229,0.12);
+  --div-pos: #3987e5; --div-neg: #e66767; --div-mid: #383835;
+  --track: #184f95;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  --up: #e66767; --down: #0ca30c;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+header h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; }
+header p { margin: 0; color: var(--ink-2); }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 20px 0 16px;
+  position: sticky; top: 0; background: var(--page); padding: 10px 0; z-index: 5;
+  border-bottom: 1px solid var(--border); }
+.filters label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-2); }
+select, input[type=search] { font: inherit; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; min-height: 34px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: inherit; border: 0; background: transparent; color: var(--ink-2);
+  padding: 6px 12px; cursor: pointer; min-height: 34px; }
+.seg button[aria-pressed="true"] { background: var(--accent-wash); color: var(--ink); font-weight: 600; }
+.theme-btn { margin-left: auto; }
+.grid { display: grid; gap: 16px; }
+.tiles { grid-template-columns: repeat(4, 1fr); }
+.two { grid-template-columns: 1fr 1fr; }
+.two-wide { grid-template-columns: 1.4fr 1fr; }
+@media (max-width: 900px) { .tiles { grid-template-columns: 1fr 1fr; }
+  .two, .two-wide { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px; min-width: 0; }
+.card h2 { font-size: 15px; margin: 0 0 2px; font-weight: 620; }
+.card .sub { color: var(--ink-2); font-size: 12.5px; margin: 0 0 12px; }
+section { margin-top: 16px; }
+
+/* hero */
+.hero { display: flex; flex-wrap: wrap; gap: 20px 40px; align-items: flex-end; }
+.hero .figure { font-size: 50px; line-height: 1.05; font-weight: 650; letter-spacing: -0.015em; }
+.hero .figure.good { color: var(--down); } .hero .figure.bad { color: var(--up); }
+.hero .caption { color: var(--ink-2); font-size: 13px; max-width: 46ch; }
+.hero .caption b { color: var(--ink); font-weight: 600; }
+.hero dl { display: flex; gap: 28px; margin: 0; flex-wrap: wrap; }
+.hero dt { color: var(--ink-2); font-size: 12px; margin-bottom: 2px; }
+.hero dd { margin: 0; font-size: 17px; font-weight: 600; }
+
+/* tiles */
+.tile .label { color: var(--ink-2); font-size: 12.5px; }
+.tile .value { font-size: 28px; font-weight: 620; margin: 2px 0; }
+.tile .delta { font-size: 12.5px; color: var(--ink-2); }
+.tile .spark { margin-top: 6px; }
+.up { color: var(--up); } .down { color: var(--down); }
+
+/* charts */
+/* height:auto lets the viewBox set the aspect ratio, so a chart scaled down on
+   a narrow screen does not letterbox inside a fixed-height box. */
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { fill: var(--muted); font-size: 11px; }
+svg .lbl { fill: var(--ink-2); font-size: 12px; }
+svg .val { fill: var(--ink); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+svg .valin { font-size: 11px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 10px; font-size: 12.5px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+.legend i.line { height: 3px; border-radius: 2px; }
+
+/* tables */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th { color: var(--ink-2); font-weight: 600; font-size: 12px; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.table-scroll { overflow-x: auto; }
+details { margin-top: 10px; }
+details summary { cursor: pointer; color: var(--ink-2); font-size: 12.5px; }
+details .table-scroll { max-height: 340px; overflow-y: auto; margin-top: 8px; }
+
+/* chips */
+.chip { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .02em;
+  border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; color: var(--ink-2);
+  white-space: nowrap; }
+.chip.email { color: var(--ink); }
+.chip.ok { color: var(--down); } .chip.warn { color: var(--ink); }
+.st { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; }
+.st i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+
+/* inbox */
+.feed-tools { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.feed-tools input { flex: 1 1 240px; }
+.msg { border-bottom: 1px solid var(--grid); padding: 10px 0; }
+.msg:last-child { border-bottom: 0; }
+.msg .top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.msg .who { font-weight: 600; }
+.msg .when { color: var(--muted); font-size: 12px; margin-left: auto; font-variant-numeric: tabular-nums; }
+.msg .subj { color: var(--ink-2); font-size: 13px; margin: 3px 0 0; }
+.msg .parsed { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; font-size: 12.5px; color: var(--ink-2); }
+.msg .parsed b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.msg pre { background: var(--page); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap; overflow-x: auto; margin: 8px 0 0; color: var(--ink-2); }
+button.more { font: inherit; margin-top: 12px; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+
+/* intel */
+.notecard { border-bottom: 1px solid var(--grid); padding: 11px 0; }
+.notecard:last-child { border-bottom: 0; }
+.notecard .top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.notecard h3 { font-size: 13.5px; margin: 5px 0 3px; font-weight: 620; }
+.notecard p { margin: 0; color: var(--ink-2); font-size: 13px; }
+.notecard .when { color: var(--muted); font-size: 12px; margin-left: auto; }
+.wasde { background: var(--accent-wash); border-radius: 8px; padding: 11px 12px; margin: 8px 0; border-bottom: 0; }
+
+/* meter */
+.meter { display: block; width: 100%; height: 8px; border-radius: 999px;
+  background: var(--track); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 999px; background: var(--s1); }
+.meter i.bad { background: var(--critical); }
+.mlab { font-size: 11.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+.tip { position: fixed; pointer-events: none; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12.5px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 20; display: none; max-width: 300px; }
+.tip b { font-weight: 650; font-variant-numeric: tabular-nums; }
+.tip .hd { font-weight: 650; margin-bottom: 4px; }
+.tip .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.tip i { width: 12px; height: 3px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+.notes { color: var(--ink-2); font-size: 12.5px; }
+.notes li { margin: 5px 0; }
+.empty { color: var(--muted); font-size: 13px; padding: 10px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Wheat Procurement Desk</h1>
+    <p id="meta"></p>
+  </header>
+
+  <div class="filters" role="group" aria-label="Filters">
+    <label>Range
+      <span class="seg" id="range">
+        <button data-d="30">30 d</button><button data-d="90">90 d</button>
+        <button data-d="180">180 d</button><button data-d="365">1 yr</button>
+      </span>
+    </label>
+    <label>Wheat class <select id="fclass"></select></label>
+    <label>Origin <select id="forigin"></select></label>
+    <label>Supplier <select id="fsupplier"></select></label>
+    <label class="theme-btn">Theme
+      <span class="seg" id="theme"><button data-t="light">Light</button><button data-t="dark">Dark</button></span>
+    </label>
+  </div>
+
+  <section class="card">
+    <div class="hero" id="hero"></div>
+  </section>
+
+  <section class="grid tiles" id="tiles"></section>
+
+  <section class="card">
+    <h2>Wheat futures — forward curve</h2>
+    <p class="sub" id="curvesub"></p>
+    <div class="legend" id="curvelegend"></div>
+    <div id="curvechart"></div>
+    <details><summary>Show data</summary><div class="table-scroll" id="curvetable"></div></details>
+  </section>
+
+  <section class="card">
+    <h2>Futures history</h2>
+    <p class="sub" id="histsub"></p>
+    <div class="legend" id="histlegend"></div>
+    <div id="histchart"></div>
+    <details><summary>Show data</summary><div class="table-scroll" id="histtable"></div></details>
+  </section>
+
+  <section class="card">
+    <h2>What you are actually paying for</h2>
+    <p class="sub" id="decompsub"></p>
+    <div class="legend" id="decomplegend"></div>
+    <div id="decompchart"></div>
+    <details><summary>Show data</summary><div class="table-scroll" id="decomptable"></div></details>
+  </section>
+
+  <section class="card">
+    <h2>Supplier communications</h2>
+    <p class="sub" id="inboxsub"></p>
+    <div class="feed-tools">
+      <input type="search" id="q" placeholder="Search supplier, subject or message text" aria-label="Search messages">
+      <select id="fchannel" aria-label="Channel">
+        <option>All channels</option><option>email</option><option>whatsapp</option>
+        <option>linkedin</option><option>call</option>
+      </select>
+      <select id="fparse" aria-label="Parse state">
+        <option>All messages</option><option>Quotes only</option>
+        <option>Needs review</option><option>Unitemised margin</option><option>No price</option>
+      </select>
+    </div>
+    <div id="inbox"></div>
+    <button class="more" id="more">Show 25 more</button>
+  </section>
+
+  <section class="grid two-wide">
+    <div class="card">
+      <h2>Market intelligence</h2>
+      <p class="sub" id="intelsub"></p>
+      <div id="intelfeed"></div>
+    </div>
+    <div class="card">
+      <h2>Where the pressure is</h2>
+      <p class="sub">Notes in range by driver. Left eases UFM's cost, right raises it.</p>
+      <div class="legend" id="stancelegend"></div>
+      <div id="stancechart"></div>
+      <details><summary>Show data</summary><div class="table-scroll" id="stancetable"></div></details>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Vessels and paperwork</h2>
+    <p class="sub" id="shipsub"></p>
+    <div class="table-scroll" id="ships"></div>
+  </section>
+
+  <section class="card notes">
+    <h2>About this data</h2>
+    <ul id="notes"></ul>
+  </section>
+</div>
+<div class="tip" id="tip" role="status" aria-live="polite"></div>
+
+<script>
+const D = /*__DATA__*/null;
+const BPT = D.bushels_per_tonne;
+const VT = D.client.vessel_tonnes;
+
+const state = {
+  days: D.default_range_days, cls: 'All', origin: 'All', supplier: 'All',
+  q: '', channel: 'All channels', parse: 'All messages', shown: 25,
+};
+
+/* ---------- helpers ---------- */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const n0 = n => n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+const n2 = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const usd = n => '$' + n2(n);
+const money = n => {
+  const a = Math.abs(n);
+  if (a >= 1e6) return (n < 0 ? '-$' : '$') + (a / 1e6).toFixed(2) + 'M';
+  if (a >= 1e3) return (n < 0 ? '-$' : '$') + n0(a / 1e3) + 'k';
+  return (n < 0 ? '-$' : '$') + n0(a);
+};
+const signed = n => (n > 0 ? '+' : '') + n2(n);
+const cbuToMt = c => c / 100 * BPT;
+const dayStr = iso => iso.slice(0, 10);
+const shortDate = iso => {
+  const d = new Date(iso.slice(0, 10) + 'T00:00:00');
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+};
+const dateTime = iso => {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) +
+    (iso.length > 10 ? ' ' + iso.slice(11, 16) : '');
+};
+function cutoff() {
+  const d = new Date(D.as_of + 'T00:00:00');
+  d.setDate(d.getDate() - state.days);
+  return d.toISOString().slice(0, 10);
+}
+function niceMax(v) {
+  if (v <= 0) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const m of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p;
+  return 10 * p;
+}
+const svgEl = (w, h, inner, label) =>
+  `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"` +
+  ` role="img" aria-label="${esc(label)}">${inner}</svg>`;
+const classLabel = c => (D.classes.find(x => x.code === c) || {}).label || c || '—';
+
+/* ---------- tooltip ---------- */
+const tip = document.getElementById('tip');
+function showTip(html, ev) {
+  tip.innerHTML = html; tip.style.display = 'block';
+  const r = tip.getBoundingClientRect();
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+const hideTip = () => { tip.style.display = 'none'; };
+document.addEventListener('scroll', hideTip, true);
+
+/* ---------- filtering ---------- */
+function quotesInRange() {
+  const c = cutoff();
+  return D.quotes.filter(q =>
+    dayStr(q.ts) >= c && q.flat_usd_mt != null &&
+    (state.cls === 'All' || q.wheat_class === state.cls) &&
+    (state.origin === 'All' || q.origin === state.origin) &&
+    (state.supplier === 'All' || q.supplier === state.supplier));
+}
+function intelInRange() {
+  const c = cutoff();
+  return D.intel.filter(i => dayStr(i.ts) >= c);
+}
+function historyInRange(key) {
+  const c = cutoff();
+  return (D.history[key] || []).filter(([d]) => d >= c);
+}
+
+/* ---------- hero ---------- */
+function renderHero() {
+  const Q = quotesInRange();
+  const el = document.getElementById('hero');
+  if (!Q.length) {
+    el.innerHTML = '<p class="empty">No parsed quotes in this range and filter combination.</p>';
+    return;
+  }
+  // Compare like with like: one wheat class. Follow the filter, else the
+  // class the desk saw most offers for.
+  let cls = state.cls;
+  if (cls === 'All') {
+    const tally = {};
+    Q.forEach(q => { tally[q.wheat_class] = (tally[q.wheat_class] || 0) + 1; });
+    cls = Object.entries(tally).sort((a, b) => b[1] - a[1])[0][0];
+  }
+  const inClass = Q.filter(q => q.wheat_class === cls);
+  const mean = inClass.reduce((a, q) => a + q.flat_usd_mt, 0) / inClass.length;
+  const lastDay = inClass.reduce((a, q) => q.ts > a ? q.ts : a, '').slice(0, 10);
+  const todays = inClass.filter(q => dayStr(q.ts) === lastDay);
+  const best = todays.reduce((a, q) => (a == null || q.flat_usd_mt < a.flat_usd_mt) ? q : a, null);
+  const dMt = best.flat_usd_mt - mean;
+  const perVessel = dMt * VT;
+  const good = dMt < 0;
+
+  el.innerHTML =
+    `<div>
+      <div class="figure ${good ? 'good' : 'bad'}">${money(perVessel)}</div>
+      <div class="caption">
+        per ${n0(VT)} t vessel, versus the ${state.days}-day average for
+        <b>${esc(classLabel(cls))}</b>. Best offer on ${esc(shortDate(lastDay))} was
+        <b>${usd(best.flat_usd_mt)}/t</b> from <b>${esc(best.supplier)}</b>;
+        the ${state.days}-day average is <b>${usd(mean)}/t</b>.
+        ${good ? 'Buying at this level is cheaper than the window average.'
+               : 'Buying at this level is dearer than the window average.'}
+      </div>
+    </div>
+    <dl>
+      <div><dt>Best offer today</dt><dd>${usd(best.flat_usd_mt)}/t</dd></div>
+      <div><dt>vs ${state.days}-day avg</dt>
+        <dd class="${good ? 'down' : 'up'}">${signed(dMt)}/t</dd></div>
+      <div><dt>Full vessel at this price</dt><dd>${money(best.flat_usd_mt * VT)}</dd></div>
+      <div><dt>A $5/t move</dt><dd>${money(5 * VT)}</dd></div>
+    </dl>`;
+}
+
+/* ---------- stat tiles ---------- */
+function sparkline(vals, w = 150, h = 30) {
+  if (vals.length < 2) return '';
+  const lo = Math.min(...vals), hi = Math.max(...vals), sp = (hi - lo) || 1;
+  const x = i => i / (vals.length - 1) * (w - 2) + 1;
+  const y = v => h - 3 - (v - lo) / sp * (h - 6);
+  const d = vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  return svgEl(w, h,
+    `<path d="${d}" fill="none" stroke="var(--neutral-bar)" stroke-width="2"
+       stroke-linejoin="round" stroke-linecap="round"/>
+     <circle cx="${x(vals.length - 1).toFixed(1)}" cy="${y(vals[vals.length - 1]).toFixed(1)}"
+       r="3.5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/>`,
+    'Recent trend, last 60 sessions');
+}
+function renderTiles() {
+  const Q = quotesInRange();
+  const show = ['srw', 'hrw', 'usdthb'];
+  const cards = D.benchmarks.filter(b => show.includes(b.key)).map(b => {
+    const dp = b.delta_pct, cls = dp > 0 ? 'up' : dp < 0 ? 'down' : '';
+    const val = b.unit === 'c/bu'
+      ? n2(b.last) + '<span style="font-size:14px;font-weight:500"> c/bu</span>'
+      : n2(b.last);
+    const extra = b.unit === 'c/bu'
+      ? ` · ${usd(cbuToMt(b.last))}/t` : '';
+    return `<div class="card tile">
+      <div class="label">${esc(b.label)}</div>
+      <div class="value">${val}</div>
+      <div class="delta"><span class="${cls}">${dp == null ? '—' : signed(dp) + '%'}</span>
+        on the day${extra}</div>
+      <div class="spark">${sparkline(b.spark)}</div></div>`;
+  });
+  const review = Q.filter(q => q.confidence < 1).length;
+  const gap = Q.filter(q => (q.reconcile_gap || 0) > 0.75).length;
+  const sups = new Set(Q.map(q => q.supplier)).size;
+  cards.push(`<div class="card tile">
+    <div class="label">Quotes parsed in range</div>
+    <div class="value">${n0(Q.length)}</div>
+    <div class="delta">from ${sups} supplier${sups === 1 ? '' : 's'} ·
+      ${review} need review · ${gap} unitemised</div>
+    <div class="spark"></div></div>`);
+  document.getElementById('tiles').innerHTML = cards.join('');
+}
+
+/* ---------- forward curve: grouped bars ---------- */
+const CURVE_SERIES = [
+  { key: 'srw', label: 'Chicago SRW', color: 'var(--s1)' },
+  { key: 'hrw', label: 'KC HRW', color: 'var(--s2)' },
+];
+function renderCurve() {
+  const months = (D.curve.srw || []).map(p => p.label);
+  const host = document.getElementById('curvechart');
+  if (!months.length) { host.innerHTML = '<p class="empty">No forward curve data.</p>'; return; }
+
+  const W = 1060, H = 316, L = 54, R = 14, T = 30, B = 46;
+  const pw = W - L - R, ph = H - T - B;
+  const vals = CURVE_SERIES.flatMap(s => (D.curve[s.key] || []).map(p => p.usd_mt || 0));
+  const max = niceMax(Math.max(...vals));
+  const y = v => T + ph - v / max * ph;
+  const gw = pw / months.length;
+  const bw = Math.min(24, (gw * 0.64 - 2) / CURVE_SERIES.length);
+
+  let g = '';
+  for (let t = 0; t <= 4; t++) {
+    const v = max * t / 4, yy = y(v).toFixed(1);
+    g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="var(--grid)" stroke-width="1"/>
+          <text x="${L - 8}" y="${+yy + 4}" text-anchor="end">${n0(v)}</text>`;
+  }
+  g += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--axis)" stroke-width="1"/>`;
+
+  months.forEach((m, i) => {
+    const cx = L + gw * i + gw / 2;
+    const groupW = bw * CURVE_SERIES.length + 2;
+    CURVE_SERIES.forEach((s, k) => {
+      const p = (D.curve[s.key] || [])[i];
+      if (!p || p.usd_mt == null) return;
+      const x = cx - groupW / 2 + k * (bw + 2);
+      const h = Math.max(0, y(0) - y(p.usd_mt));
+      // 4px rounded data-end, square at the baseline.
+      const r = Math.min(4, h);
+      g += `<path d="M${x},${y(0)} v${-(h - r)} a${r},${r} 0 0 1 ${r},${-r}
+        h${bw - 2 * r} a${r},${r} 0 0 1 ${r},${r} v${h - r} z"
+        fill="${s.color}" data-m="${esc(m)}" data-s="${esc(s.label)}"
+        data-v="${p.usd_mt}" data-c="${p.c_bu}" data-sym="${esc(p.symbol)}" tabindex="0"/>`;
+      g += `<text class="val" x="${x + bw / 2}" y="${y(p.usd_mt) - 6}" text-anchor="middle">${
+        p.usd_mt.toFixed(1)}</text>`;
+    });
+    g += `<text class="lbl" x="${cx}" y="${H - B + 20}" text-anchor="middle">${esc(m)}</text>`;
+  });
+  g += `<text x="${L - 8}" y="${T - 14}" text-anchor="end">USD/t</text>`;
+  host.innerHTML = svgEl(W, H, g, 'Wheat futures forward curve by contract month, US dollars per tonne');
+
+  host.querySelectorAll('path[data-m]').forEach(el => {
+    const t = ev => showTip(
+      `<div class="hd">${esc(el.dataset.s)} · ${esc(el.dataset.m)}</div>
+       <div class="row"><span>USD/t</span><b>${usd(+el.dataset.v)}</b></div>
+       <div class="row"><span>c/bu</span><b>${n2(+el.dataset.c)}</b></div>
+       <div class="row"><span>Full vessel</span><b>${money(+el.dataset.v * VT)}</b></div>
+       <div class="row"><span>Contract</span><b>${esc(el.dataset.sym)}</b></div>`, ev);
+    el.addEventListener('pointermove', t);
+    el.addEventListener('pointerleave', hideTip);
+    el.addEventListener('focus', e => t({ clientX: el.getBoundingClientRect().left,
+      clientY: el.getBoundingClientRect().top }));
+    el.addEventListener('blur', hideTip);
+  });
+
+  document.getElementById('curvelegend').innerHTML = CURVE_SERIES.map(s =>
+    `<span><i style="background:${s.color}"></i>${esc(s.label)}</span>`).join('');
+
+  const srw = D.curve.srw || [], hrw = D.curve.hrw || [];
+  const carry = s => s.length > 1 && s[0].usd_mt != null
+    ? s[s.length - 1].usd_mt - s[0].usd_mt : null;
+  const cs = carry(srw), ch = carry(hrw);
+  const word = v => v == null ? '' : (v > 0 ? 'carry' : 'inverse');
+  document.getElementById('curvesub').textContent =
+    `Settlement for each listed contract month, converted at ${BPT.toFixed(4)} bu/t. ` +
+    `A point-in-time snapshot, so the range filter does not apply. ` +
+    (cs != null ? `SRW is in ${word(cs)} — ${srw[srw.length - 1].label} trades ` +
+      `${signed(cs)}/t against ${srw[0].label}` : '') +
+    (ch != null ? `; HRW in ${word(ch)} at ${signed(ch)}/t.` : '.');
+
+  document.getElementById('curvetable').innerHTML =
+    `<table><thead><tr><th>Contract month</th>
+      ${CURVE_SERIES.map(s => `<th class="num">${esc(s.label)} c/bu</th>
+        <th class="num">${esc(s.label)} USD/t</th>`).join('')}</tr></thead><tbody>
+      ${months.map((m, i) => `<tr><td>${esc(m)}</td>${CURVE_SERIES.map(s => {
+        const p = (D.curve[s.key] || [])[i] || {};
+        return `<td class="num">${p.c_bu == null ? '—' : n2(p.c_bu)}</td>
+                <td class="num">${p.usd_mt == null ? '—' : n2(p.usd_mt)}</td>`;
+      }).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+/* ---------- futures history: lines + crosshair ---------- */
+function renderHistory() {
+  const series = CURVE_SERIES.map(s => ({ ...s, pts: historyInRange(s.key) }))
+    .filter(s => s.pts.length > 1);
+  const host = document.getElementById('histchart');
+  if (!series.length) { host.innerHTML = '<p class="empty">No price history in range.</p>'; return; }
+
+  const W = 1060, H = 336, L = 54, R = 54, T = 30, B = 40;
+  const pw = W - L - R, ph = H - T - B;
+  const dates = series[0].pts.map(p => p[0]);
+  const all = series.flatMap(s => s.pts.map(p => p[1]));
+  let lo = Math.min(...all), hi = Math.max(...all);
+  const pad = (hi - lo) * 0.08 || 5; lo -= pad; hi += pad;
+  const x = i => L + (dates.length === 1 ? pw / 2 : i / (dates.length - 1) * pw);
+  const y = v => T + ph - (v - lo) / (hi - lo) * ph;
+
+  let g = '';
+  for (let t = 0; t <= 4; t++) {
+    const v = lo + (hi - lo) * t / 4, yy = y(v).toFixed(1);
+    g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="var(--grid)" stroke-width="1"/>
+          <text x="${L - 8}" y="${+yy + 4}" text-anchor="end">${n0(v)}</text>`;
+  }
+  const step = Math.max(1, Math.floor(dates.length / 8));
+  dates.forEach((d, i) => {
+    if (i % step && i !== dates.length - 1) return;
+    g += `<text class="lbl" x="${x(i)}" y="${H - B + 20}" text-anchor="middle">${esc(shortDate(d))}</text>`;
+  });
+  series.forEach(s => {
+    const d = s.pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p[1]).toFixed(1)}`).join('');
+    g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2"
+      stroke-linejoin="round" stroke-linecap="round"/>`;
+    const last = s.pts[s.pts.length - 1];
+    g += `<circle cx="${x(s.pts.length - 1).toFixed(1)}" cy="${y(last[1]).toFixed(1)}" r="4.5"
+      fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>`;
+    g += `<text class="val" x="${W - R + 8}" y="${y(last[1]) + 4}">${n0(last[1])}</text>`;
+  });
+  g += `<text x="${L - 8}" y="${T - 14}" text-anchor="end">c/bu</text>`;
+  g += `<line id="cross" x1="0" x2="0" y1="${T}" y2="${T + ph}" stroke="var(--axis)"
+    stroke-width="1" style="display:none"/>`;
+  g += `<rect id="hitbox" x="${L}" y="${T}" width="${pw}" height="${ph}" fill="transparent"/>`;
+  host.innerHTML = svgEl(W, H, g, 'Daily settlement history for Chicago SRW and KC HRW wheat futures');
+
+  const svg = host.querySelector('svg');
+  const cross = svg.querySelector('#cross');
+  const hit = svg.querySelector('#hitbox');
+  function at(ev) {
+    const r = svg.getBoundingClientRect();
+    const vx = (ev.clientX - r.left) / r.width * W;
+    let i = Math.round((vx - L) / pw * (dates.length - 1));
+    i = Math.max(0, Math.min(dates.length - 1, i));
+    cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i));
+    cross.style.display = '';
+    showTip(`<div class="hd">${esc(shortDate(dates[i]))} ${dates[i].slice(0, 4)}</div>` +
+      series.map(s => `<div class="row"><span><i style="background:${s.color}"></i>${
+        esc(s.label)}</span><b>${n2(s.pts[i][1])} c/bu</b></div>
+        <div class="row"><span style="padding-left:18px">landed basis-free</span><b>${
+        usd(cbuToMt(s.pts[i][1]))}/t</b></div>`).join(''), ev);
+  }
+  hit.addEventListener('pointermove', at);
+  hit.addEventListener('pointerleave', () => { cross.style.display = 'none'; hideTip(); });
+
+  const first = series[0].pts[0], last = series[0].pts[series[0].pts.length - 1];
+  const ch = last[1] - first[1];
+  document.getElementById('histsub').textContent =
+    `Daily settlements, last ${state.days} days. ${series[0].label} ${
+      ch >= 0 ? 'up' : 'down'} ${n2(Math.abs(ch))} c/bu over the window — ` +
+    `${money(Math.abs(cbuToMt(ch)) * VT)} per vessel.`;
+  document.getElementById('histlegend').innerHTML = series.map(s =>
+    `<span><i class="line" style="background:${s.color}"></i>${esc(s.label)}</span>`).join('');
+  document.getElementById('histtable').innerHTML =
+    `<table><thead><tr><th>Date</th>${series.map(s =>
+      `<th class="num">${esc(s.label)} c/bu</th><th class="num">USD/t</th>`).join('')}
+      </tr></thead><tbody>${dates.map((d, i) => `<tr><td>${esc(d)}</td>${series.map(s =>
+        `<td class="num">${n2(s.pts[i][1])}</td>
+         <td class="num">${n2(cbuToMt(s.pts[i][1]))}</td>`).join('')}</tr>`)
+      .reverse().join('')}</tbody></table>`;
+}
+
+/* ---------- price decomposition: stacked horizontal bars ---------- */
+const PARTS = [
+  { key: 'futures', label: 'Futures', color: 'var(--s1)' },
+  { key: 'basis', label: 'Basis', color: 'var(--s2)' },
+  { key: 'freight', label: 'Freight & insurance', color: 'var(--s3)' },
+  { key: 'margin', label: 'Supplier margin', color: 'var(--s4)' },
+  { key: 'gap', label: 'Unitemised', color: 'var(--s5)' },
+];
+function decompose(q) {
+  const fut = q.futures_c_bu != null ? cbuToMt(q.futures_c_bu) : null;
+  const bas = q.basis_c_bu != null ? cbuToMt(q.basis_c_bu) : null;
+  const frt = q.freight_usd_mt, mgn = q.margin_usd_mt || 0;
+  const gap = Math.max(0, q.reconcile_gap || 0);
+  if (fut == null || bas == null || frt == null) return null;
+  return { futures: fut, basis: bas, freight: frt, margin: mgn, gap,
+    total: fut + bas + frt + mgn + gap };
+}
+function renderDecomp() {
+  // Latest offer per supplier in range: the comparison the desk actually makes.
+  const byS = new Map();
+  quotesInRange().forEach(q => {
+    const d = decompose(q); if (!d) return;
+    const cur = byS.get(q.supplier);
+    if (!cur || q.ts > cur.q.ts) byS.set(q.supplier, { q, d });
+  });
+  const rows = [...byS.values()].sort((a, b) => a.d.total - b.d.total).slice(0, 10);
+  const host = document.getElementById('decompchart');
+  if (!rows.length) {
+    host.innerHTML = '<p class="empty">No fully itemised quotes in this range.</p>';
+    document.getElementById('decomplegend').innerHTML = '';
+    document.getElementById('decomptable').innerHTML = '';
+    document.getElementById('decompsub').textContent =
+      'Each supplier’s most recent offer, split into the four components of a quote.';
+    return;
+  }
+
+  const W = 1060, LBL = 214, R = 86, T = 26, rowH = 34, bh = 20;
+  const H = T + rows.length * rowH + 12;
+  const pw = W - LBL - R;
+  const max = niceMax(Math.max(...rows.map(r => r.d.total)));
+  const x = v => LBL + v / max * pw;
+
+  let g = '';
+  for (let t = 0; t <= 4; t++) {
+    const v = max * t / 4;
+    g += `<line x1="${x(v)}" x2="${x(v)}" y1="${T - 8}" y2="${H - 8}"
+      stroke="var(--grid)" stroke-width="1"/>
+      <text x="${x(v)}" y="${T - 14}" text-anchor="middle">${n0(v)}</text>`;
+  }
+  g += `<text x="${LBL}" y="${T - 14}" text-anchor="start" style="display:none">0</text>`;
+
+  rows.forEach((r, i) => {
+    const yy = T + i * rowH;
+    g += `<text class="lbl" x="0" y="${yy + bh / 2 + 4}">${esc(r.q.supplier)}</text>`;
+    g += `<text x="0" y="${yy + bh / 2 + 17}" style="font-size:10.5px">${
+      esc(r.q.wheat_class)} ${r.q.protein != null ? r.q.protein + '%' : ''} · ${
+      esc(r.q.origin || 'origin n/k')}</text>`;
+    let acc = 0;
+    PARTS.forEach((p, k) => {
+      const v = r.d[p.key]; if (!v) return;
+      const x0 = x(acc), x1 = x(acc + v);
+      // 2px surface gap between segments; rounded only on the data end.
+      const isLast = PARTS.slice(k + 1).every(q2 => !r.d[q2.key]);
+      const w = Math.max(0, x1 - x0 - (isLast ? 0 : 2));
+      const rad = isLast ? Math.min(4, w) : 0;
+      g += rad
+        ? `<path d="M${x0},${yy} h${w - rad} a${rad},${rad} 0 0 1 ${rad},${rad}
+             v${bh - 2 * rad} a${rad},${rad} 0 0 1 ${-rad},${rad} h${-(w - rad)} z"
+             fill="${p.color}" data-p="${esc(p.label)}" data-v="${v}"
+             data-s="${esc(r.q.supplier)}" data-t="${r.d.total}" tabindex="0"/>`
+        : `<rect x="${x0}" y="${yy}" width="${w}" height="${bh}" fill="${p.color}"
+             data-p="${esc(p.label)}" data-v="${v}" data-s="${esc(r.q.supplier)}"
+             data-t="${r.d.total}" tabindex="0"/>`;
+      acc += v;
+    });
+    g += `<text class="val" x="${x(r.d.total) + 8}" y="${yy + bh / 2 + 4}">${
+      n2(r.d.total)}</text>`;
+  });
+  g += `<text x="${LBL}" y="${H - 1}" style="font-size:10.5px">USD per tonne, CIF Bangkok</text>`;
+  host.innerHTML = svgEl(W, H, g, 'Supplier quotes broken into futures, basis, freight and margin');
+
+  host.querySelectorAll('[data-p]').forEach(el => {
+    const t = ev => showTip(
+      `<div class="hd">${esc(el.dataset.s)} · ${esc(el.dataset.p)}</div>
+       <div class="row"><span>This component</span><b>${usd(+el.dataset.v)}/t</b></div>
+       <div class="row"><span>Share of flat price</span><b>${
+        (100 * el.dataset.v / el.dataset.t).toFixed(1)}%</b></div>
+       <div class="row"><span>Per vessel</span><b>${money(+el.dataset.v * VT)}</b></div>`, ev);
+    el.addEventListener('pointermove', t);
+    el.addEventListener('pointerleave', hideTip);
+    el.addEventListener('focus', () => t({
+      clientX: el.getBoundingClientRect().left + 20,
+      clientY: el.getBoundingClientRect().top }));
+    el.addEventListener('blur', hideTip);
+  });
+
+  document.getElementById('decomplegend').innerHTML = PARTS.map(p =>
+    `<span><i style="background:${p.color}"></i>${esc(p.label)}</span>`).join('');
+  const spread = rows[rows.length - 1].d.total - rows[0].d.total;
+  document.getElementById('decompsub').textContent =
+    `Each supplier’s most recent itemised offer in range, cheapest first. ` +
+    `Futures and basis are the market; freight and margin are where the ` +
+    `negotiation is. Spread between best and worst here is ${usd(spread)}/t — ` +
+    `${money(spread * VT)} on a full vessel.`;
+  document.getElementById('decomptable').innerHTML =
+    `<table><thead><tr><th>Supplier</th><th>Class</th><th>Origin</th>
+      ${PARTS.map(p => `<th class="num">${esc(p.label)}</th>`).join('')}
+      <th class="num">Flat USD/t</th><th>Quoted</th></tr></thead><tbody>
+      ${rows.map(r => `<tr><td>${esc(r.q.supplier)}</td>
+        <td>${esc(r.q.wheat_class)}</td><td>${esc(r.q.origin || '—')}</td>
+        ${PARTS.map(p => `<td class="num">${r.d[p.key] ? n2(r.d[p.key]) : '—'}</td>`).join('')}
+        <td class="num">${n2(r.d.total)}</td>
+        <td>${esc(dateTime(r.q.ts))}</td></tr>`).join('')}</tbody></table>`;
+}
+
+/* ---------- supplier communications ---------- */
+function msgQuote(id) { return D.quotes.find(q => q.message_id === id); }
+function inboxRows() {
+  const c = cutoff();
+  const needle = state.q.trim().toLowerCase();
+  return D.messages.filter(m => {
+    if (dayStr(m.ts) < c) return false;
+    if (state.channel !== 'All channels' && m.channel !== state.channel) return false;
+    if (state.supplier !== 'All' && m.supplier !== state.supplier) return false;
+    const q = msgQuote(m.id);
+    if (state.cls !== 'All' && (!q || q.wheat_class !== state.cls)) return false;
+    if (state.origin !== 'All' && (!q || q.origin !== state.origin)) return false;
+    if (state.parse === 'Quotes only' && !q) return false;
+    if (state.parse === 'No price' && q) return false;
+    if (state.parse === 'Needs review' && (!q || q.confidence >= 1)) return false;
+    if (state.parse === 'Unitemised margin' && (!q || (q.reconcile_gap || 0) <= 0.75)) return false;
+    if (needle && !(`${m.supplier} ${m.subject || ''} ${m.body}`.toLowerCase().includes(needle)))
+      return false;
+    return true;
+  }).sort((a, b) => b.ts.localeCompare(a.ts));
+}
+function renderInbox() {
+  const rows = inboxRows();
+  const host = document.getElementById('inbox');
+  const slice = rows.slice(0, state.shown);
+  host.innerHTML = slice.length ? slice.map(m => {
+    const q = msgQuote(m.id);
+    const fields = q ? [
+      ['Class', q.wheat_class ? `${classLabel(q.wheat_class)}${
+        q.protein != null ? ' ' + q.protein + '%' : ''}` : null],
+      ['Origin', q.origin],
+      ['Shipment', q.ship_from ? `${shortDate(q.ship_from)} – ${shortDate(q.ship_to)}` : null],
+      ['Quantity', q.tonnes ? n0(q.tonnes) + ' t' : null],
+      ['Futures', q.futures_c_bu ? `${n2(q.futures_c_bu)} c/bu${
+        q.futures_ref ? ' (' + q.futures_ref + ')' : ''}` : null],
+      ['Basis', q.basis_c_bu != null ? `${n0(q.basis_c_bu)} c/bu` : null],
+      ['Freight', q.freight_usd_mt != null ? usd(q.freight_usd_mt) + '/t' : null],
+      ['Margin', q.margin_usd_mt != null ? usd(q.margin_usd_mt) + '/t' : null],
+      ['Flat', q.flat_usd_mt != null
+        ? `${usd(q.flat_usd_mt)}/t${q.flat_stated ? '' : ' (derived)'}` : null],
+    ].filter(f => f[1]) : [];
+    const flags = [];
+    if (!q) flags.push('<span class="chip">no price</span>');
+    else {
+      flags.push(`<span class="chip ${q.confidence >= 1 ? 'ok' : 'warn'}">parsed ${
+        Math.round(q.confidence * 100)}%</span>`);
+      if ((q.reconcile_gap || 0) > 0.75)
+        flags.push(`<span class="st"><i style="background:var(--warning)"></i>unitemised ${
+          usd(q.reconcile_gap)}/t</span>`);
+      if (q.missing) flags.push(`<span class="chip">missing: ${esc(
+        q.missing.replace(/_usd_mt|_c_bu/g, '').replace(/_/g, ' '))}</span>`);
+    }
+    return `<div class="msg">
+      <div class="top">
+        <span class="chip ${esc(m.channel)}">${esc(m.channel)}</span>
+        <span class="who">${esc(m.supplier)}</span>
+        ${flags.join(' ')}
+        <span class="when">${esc(dateTime(m.ts))}</span>
+      </div>
+      ${m.subject ? `<p class="subj">${esc(m.subject)}</p>` : ''}
+      ${fields.length ? `<div class="parsed">${fields.map(([k, v]) =>
+        `<span>${esc(k)} <b>${esc(v)}</b></span>`).join('')}</div>` : ''}
+      <details><summary>Show the message as it arrived</summary>
+        <pre>${esc(m.body)}</pre></details>
+    </div>`;
+  }).join('') : '<p class="empty">No messages match these filters.</p>';
+
+  const more = document.getElementById('more');
+  more.style.display = rows.length > state.shown ? '' : 'none';
+  const withQ = rows.filter(m => msgQuote(m.id)).length;
+  document.getElementById('inboxsub').textContent =
+    `Every inbound channel in one feed: ${n0(rows.length)} messages in range, ` +
+    `${n0(withQ)} carrying a price. The parser reads the message text only — ` +
+    `open any message to see what it was given and what it pulled out.`;
+}
+
+/* ---------- market intelligence ---------- */
+const STANCE = {
+  bullish: { color: 'var(--div-neg)', label: 'Bullish — raises cost' },
+  bearish: { color: 'var(--div-pos)', label: 'Bearish — eases cost' },
+  neutral: { color: 'var(--div-mid)', label: 'Neutral' },
+};
+function renderIntel() {
+  const rows = intelInRange().slice().reverse();
+  const host = document.getElementById('intelfeed');
+  host.innerHTML = rows.length ? rows.slice(0, 14).map(i => {
+    const s = STANCE[i.stance] || STANCE.neutral;
+    return `<div class="notecard ${i.kind === 'wasde' ? 'wasde' : ''}">
+      <div class="top">
+        ${i.kind === 'wasde' ? '<span class="chip warn">WASDE</span>' : ''}
+        <span class="chip">${esc(i.lever)}</span>
+        <span class="st"><i style="background:${s.color}"></i>${esc(s.label)}</span>
+        <span class="when">${esc(dateTime(i.ts))}</span>
+      </div>
+      <h3>${esc(i.headline)}</h3>
+      <p>${esc(i.body)}</p>
+      <p style="margin-top:4px;font-size:12px;color:var(--muted)">${esc(i.source)} ·
+        confidence ${esc(i.confidence)}</p>
+    </div>`;
+  }).join('') : '<p class="empty">No intelligence notes in range.</p>';
+
+  const w = rows.find(i => i.kind === 'wasde');
+  document.getElementById('intelsub').textContent =
+    `The research behind a price view, newest first. ` +
+    (w ? `Last WASDE ${shortDate(w.ts)}: ${w.stance}. ` : '') +
+    `Stance is the effect on price — for a buyer, bullish is the bad direction.`;
+}
+function renderStance() {
+  const rows = intelInRange();
+  const levers = [...new Set(rows.map(r => r.lever))];
+  const tally = levers.map(l => {
+    const sub = rows.filter(r => r.lever === l);
+    return { lever: l, bull: sub.filter(r => r.stance === 'bullish').length,
+      bear: sub.filter(r => r.stance === 'bearish').length,
+      neut: sub.filter(r => r.stance === 'neutral').length, n: sub.length };
+  }).sort((a, b) => b.n - a.n);
+  const host = document.getElementById('stancechart');
+  if (!tally.length) {
+    host.innerHTML = '<p class="empty">No notes in range.</p>';
+    document.getElementById('stancelegend').innerHTML = '';
+    document.getElementById('stancetable').innerHTML = '';
+    return;
+  }
+
+  const W = 470, LBL = 112, T = 22, rowH = 28, bh = 16;
+  const H = T + tally.length * rowH + 16;
+  const half = (W - LBL - 14) / 2, mid = LBL + half;
+  const reach = Math.max(...tally.map(t => Math.max(t.bear + t.neut / 2, t.bull + t.neut / 2))) || 1;
+  const u = half / reach;
+
+  let g = `<line x1="${mid}" x2="${mid}" y1="${T - 8}" y2="${H - 12}"
+    stroke="var(--axis)" stroke-width="1"/>
+    <text x="${LBL}" y="${T - 12}" text-anchor="start">eases</text>
+    <text x="${W - 4}" y="${T - 12}" text-anchor="end">raises</text>`;
+  tally.forEach((t, i) => {
+    const yy = T + i * rowH;
+    g += `<text class="lbl" x="0" y="${yy + bh / 2 + 4}">${esc(t.lever)}</text>`;
+    const segs = [
+      { v: t.bear, from: -(t.bear + t.neut / 2), st: 'bearish' },
+      { v: t.neut, from: -t.neut / 2, st: 'neutral' },
+      { v: t.bull, from: t.neut / 2, st: 'bullish' },
+    ];
+    segs.forEach(s => {
+      if (!s.v) return;
+      const x0 = mid + s.from * u, w = Math.max(0, s.v * u - 2);
+      g += `<rect x="${x0}" y="${yy}" width="${w}" height="${bh}" rx="2"
+        fill="${STANCE[s.st].color}" data-l="${esc(t.lever)}" data-st="${s.st}"
+        data-v="${s.v}" data-n="${t.n}" tabindex="0"/>`;
+    });
+    g += `<text class="val" x="${W - 4}" y="${yy + bh / 2 + 4}" text-anchor="end"
+      style="font-size:10.5px">${t.n}</text>`;
+  });
+  host.innerHTML = svgEl(W, H, g, 'Count of intelligence notes by driver and price direction');
+
+  host.querySelectorAll('rect[data-l]').forEach(el => {
+    const t = ev => showTip(
+      `<div class="hd">${esc(el.dataset.l)}</div>
+       <div class="row"><span>${esc(STANCE[el.dataset.st].label)}</span>
+         <b>${el.dataset.v} of ${el.dataset.n}</b></div>`, ev);
+    el.addEventListener('pointermove', t);
+    el.addEventListener('pointerleave', hideTip);
+    el.addEventListener('focus', () => t({
+      clientX: el.getBoundingClientRect().left + 10,
+      clientY: el.getBoundingClientRect().top }));
+    el.addEventListener('blur', hideTip);
+  });
+  document.getElementById('stancelegend').innerHTML = ['bearish', 'neutral', 'bullish']
+    .map(k => `<span><i style="background:${STANCE[k].color}"></i>${esc(STANCE[k].label)}</span>`)
+    .join('');
+  document.getElementById('stancetable').innerHTML =
+    `<table><thead><tr><th>Driver</th><th class="num">Bearish</th>
+      <th class="num">Neutral</th><th class="num">Bullish</th><th class="num">Notes</th>
+      </tr></thead><tbody>${tally.map(t => `<tr><td>${esc(t.lever)}</td>
+      <td class="num">${t.bear}</td><td class="num">${t.neut}</td>
+      <td class="num">${t.bull}</td><td class="num">${t.n}</td></tr>`).join('')}
+      </tbody></table>`;
+}
+
+/* ---------- vessels and documents ---------- */
+const DOC_TONE = { Received: 'var(--good)', Pending: 'var(--warning)', Overdue: 'var(--critical)' };
+function renderShips() {
+  const ships = D.shipments.filter(s =>
+    (state.cls === 'All' || s.wheat_class === state.cls) &&
+    (state.origin === 'All' || s.origin === state.origin))
+    .slice().sort((a, b) => b.laycan_from.localeCompare(a.laycan_from));
+  const host = document.getElementById('ships');
+  if (!ships.length) { host.innerHTML = '<p class="empty">No vessels match these filters.</p>'; return; }
+
+  let overdueTotal = 0;
+  const body = ships.map(s => {
+    const docs = D.documents.filter(d => d.shipment_id === s.id);
+    const got = docs.filter(d => d.status === 'Received').length;
+    const over = docs.filter(d => d.status === 'Overdue').length;
+    overdueTotal += over;
+    const pct = docs.length ? Math.round(100 * got / docs.length) : 0;
+    const missing = docs.filter(d => d.status !== 'Received').map(d => d.kind);
+    return `<tr>
+      <td>${esc(s.laycan_from.slice(0, 7))}<div style="color:var(--muted);font-size:11.5px">${
+        esc(shortDate(s.laycan_from))} – ${esc(shortDate(s.laycan_to))}</div></td>
+      <td>${esc(s.vessel || 'not yet nominated')}<div style="color:var(--muted);font-size:11.5px">${
+        esc(s.supplier)}</div></td>
+      <td>${esc(s.wheat_class)}<div style="color:var(--muted);font-size:11.5px">${
+        esc(s.origin)}</div></td>
+      <td class="num">${n0(s.tonnes)}${s.tonnes < VT
+        ? '<div style="color:var(--muted);font-size:11.5px">pooled</div>' : ''}</td>
+      <td><span class="chip">${esc(s.status)}</span></td>
+      <td class="num">${s.flat_usd_mt ? n2(s.flat_usd_mt) : '—'}</td>
+      <td class="num">${s.flat_usd_mt ? money(s.flat_usd_mt * s.tonnes) : '—'}</td>
+      <td style="min-width:150px">
+        <span class="meter" title="${esc(got + ' of ' + docs.length + ' received')}">
+          <i class="${over ? 'bad' : ''}" style="width:${pct}%"></i></span>
+        <span class="mlab">${got}/${docs.length} received${
+          over ? ` · <span style="color:var(--critical)">&#9888; ${over} overdue</span>` : ''}</span>
+        ${missing.length ? `<details><summary>${missing.length} outstanding</summary>
+          <div style="font-size:12px;color:var(--ink-2);padding-top:4px">${
+            docs.filter(d => d.status !== 'Received').map(d =>
+              `<div class="st"><i style="background:${DOC_TONE[d.status]}"></i>${
+                esc(d.kind)} — ${esc(d.status)}</div>`).join('')}</div></details>` : ''}
+      </td></tr>`;
+  }).join('');
+
+  host.innerHTML = `<table><thead><tr><th>Laycan</th><th>Vessel</th><th>Class / origin</th>
+    <th class="num">Tonnes</th><th>Status</th><th class="num">USD/t</th>
+    <th class="num">Cargo value</th><th>Documents</th></tr></thead><tbody>${body}</tbody></table>`;
+  document.getElementById('shipsub').textContent =
+    `${ships.length} cargoes, with every certificate and contract tracked against the vessel ` +
+    `it belongs to instead of the thread it arrived in` +
+    (overdueTotal ? ` — ${overdueTotal} documents are overdue on cargoes already landed.` : '.');
+}
+
+/* ---------- wiring ---------- */
+function renderAll() {
+  renderHero(); renderTiles(); renderCurve(); renderHistory();
+  renderDecomp(); renderInbox(); renderIntel(); renderStance(); renderShips();
+}
+function seg(id, key, attr, cast) {
+  const box = document.getElementById(id);
+  box.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      state[key] = cast ? cast(b.dataset[attr]) : b.dataset[attr];
+      box.querySelectorAll('button').forEach(x =>
+        x.setAttribute('aria-pressed', String(x === b)));
+      if (key === 'days') state.shown = 25;
+      renderAll();
+    });
+  });
+}
+function fill(id, values, key) {
+  const el = document.getElementById(id);
+  el.innerHTML = ['All', ...values].map(v =>
+    `<option value="${esc(v)}">${esc(v === 'All' ? 'All' : v)}</option>`).join('');
+  el.addEventListener('change', () => { state[key] = el.value; state.shown = 25; renderAll(); });
+}
+
+document.getElementById('meta').textContent =
+  `${D.client.name} · ${D.client.country} · ${n0(D.client.vessels_per_year)} Panamax cargoes a year ` +
+  `into ${D.client.discharge_port}. Market data to ${D.as_of}; page built ${
+    D.built_at.replace('T', ' ')}.`;
+
+seg('range', 'days', 'd', Number);
+document.querySelectorAll('#range button').forEach(b =>
+  b.setAttribute('aria-pressed', String(Number(b.dataset.d) === state.days)));
+fill('fclass', D.classes.map(c => c.code), 'cls');
+fill('forigin', D.origins, 'origin');
+fill('fsupplier', D.suppliers, 'supplier');
+
+const themeBox = document.getElementById('theme');
+function applyTheme(t) {
+  if (t) document.documentElement.setAttribute('data-theme', t);
+  themeBox.querySelectorAll('button').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.t === t)));
+  renderAll();
+}
+themeBox.querySelectorAll('button').forEach(b =>
+  b.addEventListener('click', () => {
+    try { localStorage.setItem('wheatdesk-theme', b.dataset.t); } catch (e) { /* ignore */ }
+    applyTheme(b.dataset.t);
+  }));
+
+document.getElementById('q').addEventListener('input', e => {
+  state.q = e.target.value; state.shown = 25; renderInbox();
+});
+document.getElementById('fchannel').addEventListener('change', e => {
+  state.channel = e.target.value; state.shown = 25; renderInbox();
+});
+document.getElementById('fparse').addEventListener('change', e => {
+  state.parse = e.target.value; state.shown = 25; renderInbox();
+});
+document.getElementById('more').addEventListener('click', () => {
+  state.shown += 25; renderInbox();
+});
+document.getElementById('notes').innerHTML = D.notes.map(n => `<li>${esc(n)}</li>`).join('');
+
+let saved = null;
+try { saved = localStorage.getItem('wheatdesk-theme'); } catch (e) { saved = null; }
+if (saved) applyTheme(saved); else renderAll();
+addEventListener('resize', () => { hideTip(); });
+</script>
+</body>
+</html>
