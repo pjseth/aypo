@@ -23,7 +23,13 @@
     if (set) return set;
     return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }
-  setTheme(storedTheme());
+  /* The three reference designs are all light, and the desk is read in a lit
+     office, so light is what a first-time visitor gets regardless of what the OS
+     is set to. It is stamped, not stored: once the viewer picks a side with the
+     rail toggle that choice is remembered and wins from then on. */
+  var stored = storedTheme();
+  if (stored) setTheme(stored);
+  else document.documentElement.setAttribute("data-theme", "light");
 
   /* ------------------------------------------------------- agents in rail */
 

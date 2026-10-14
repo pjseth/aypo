@@ -17,19 +17,23 @@
 */
 
 :root {
-  /* ---- ground & surfaces */
-  --ground:        #e9ebf0;
-  --ground-2:      #f2f4f7;
+  /* ---- ground & surfaces.
+         The ground is SPN's lavender, unmodified, and the shell is inset far
+         enough that you actually see it — the window has to read as a window.
+         Rail → sidebar → content is a three-step recession towards white, which
+         is what makes FlowAI's white active-nav pill pop out of the sidebar. */
+  --ground:        #e3e4ed;
+  --ground-2:      #eef0f5;
   --surface:       #ffffff;
-  --surface-2:     #f5f7fa;
-  --surface-3:     #eef1f6;
-  --rail:          #fbfbfd;
-  --sidebar:       #fafbfc;
+  --surface-2:     #f6f7fa;
+  --surface-3:     #ebeef4;
+  --rail:          #eef1f6;
+  --sidebar:       #f5f7fa;
   --overlay:       rgba(20, 24, 31, 0.44);
 
   /* ---- structure */
-  --border:        #e3e6ec;
-  --border-2:      #d4d9e2;
+  --border:        #e2e5ec;
+  --border-2:      #d2d7e1;
   --border-strong: #b9c0cd;
 
   /* ---- ink */
@@ -38,6 +42,10 @@
   --ink-3:         #868d99;
   --ink-4:         #a8aeb9;
   --on-accent:     #ffffff;
+  --on-accent-2:   rgba(255, 255, 255, 0.86);
+  --on-accent-3:   rgba(255, 255, 255, 0.72);
+  --on-accent-wash: rgba(0, 0, 0, 0.11);
+  --on-accent-line: rgba(255, 255, 255, 0.20);
   --on-black:      #ffffff;
 
   /* ---- brand / accent */
@@ -72,26 +80,29 @@
   --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --t-display: 26px;
-  --t-title:   19px;
-  --t-head:    15px;
-  --t-body:    13.5px;
-  --t-sm:      12.5px;
-  --t-xs:      11.5px;
-  --t-label:   10.5px;
+  /* The references are airy, not dense: 14px body, generous steps. A buying desk
+     is information-heavy, so the air has to come from the scale and the padding
+     rather than from showing less. */
+  --t-display: 27px;
+  --t-title:   20px;
+  --t-head:    15.5px;
+  --t-body:    14px;
+  --t-sm:      13px;
+  --t-xs:      12px;
+  --t-label:   11px;
 
   /* ---- radii. Concentric: a child sits at parent − its own padding. */
-  --r-window: 18px;
+  --r-window: 20px;
   --r-card:   14px;
   --r-inner:  10px;
-  --r-ctl:    8px;
-  --r-chip:   6px;
+  --r-ctl:    9px;
+  --r-chip:   7px;
   --r-pill:   999px;
 
   /* ---- elevation. Borders carry structure; shadows carry depth. */
   --sh-xs:  0 1px 1px rgba(17, 24, 39, 0.04);
-  --sh-sm:  0 1px 2px rgba(17, 24, 39, 0.05), 0 1px 1px rgba(17, 24, 39, 0.03);
-  --sh-md:  0 2px 4px -1px rgba(17, 24, 39, 0.05), 0 6px 14px -4px rgba(17, 24, 39, 0.07);
+  --sh-sm:  0 1px 2px rgba(17, 24, 39, 0.06), 0 1px 1px rgba(17, 24, 39, 0.04);
+  --sh-md:  0 2px 4px -1px rgba(17, 24, 39, 0.06), 0 8px 18px -6px rgba(17, 24, 39, 0.10);
   --sh-lg:  0 10px 28px -6px rgba(17, 24, 39, 0.12), 0 2px 6px -1px rgba(17, 24, 39, 0.05);
   --sh-pop: 0 20px 56px -16px rgba(17, 24, 39, 0.26), 0 4px 12px -4px rgba(17, 24, 39, 0.10);
   --sh-ring: 0 0 0 3px rgba(4, 151, 114, 0.18);
@@ -103,10 +114,10 @@
   --d-slow: 260ms;
 
   /* ---- metrics */
-  --rail-w: 56px;
-  --side-w: 236px;
-  --top-h: 56px;
-  --strip-h: 54px;
+  --rail-w: 58px;
+  --side-w: 258px;
+  --top-h: 60px;
+  --strip-h: 60px;
 
   color-scheme: light;
 }
@@ -131,6 +142,10 @@
     --ink-3:         #848b97;
     --ink-4:         #666d7a;
     --on-accent:     #06120e;
+    --on-accent-2:   rgba(6, 18, 14, 0.78);
+    --on-accent-3:   rgba(6, 18, 14, 0.62);
+    --on-accent-wash: rgba(0, 0, 0, 0.10);
+    --on-accent-line: rgba(6, 18, 14, 0.16);
     --on-black:      #11131a;
 
     --accent:        #2fb48c;
@@ -187,6 +202,10 @@
   --ink-3:         #848b97;
   --ink-4:         #666d7a;
   --on-accent:     #06120e;
+  --on-accent-2:   rgba(6, 18, 14, 0.78);
+  --on-accent-3:   rgba(6, 18, 14, 0.62);
+  --on-accent-wash: rgba(0, 0, 0, 0.10);
+  --on-accent-line: rgba(6, 18, 14, 0.16);
   --on-black:      #11131a;
 
   --accent:        #2fb48c;
