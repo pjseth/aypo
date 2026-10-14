@@ -45,7 +45,6 @@
   box-shadow: var(--sh-sm);
   flex: none;
 }
-.rail-sep { width: 22px; height: 1px; background: var(--border); margin: 8px 0; flex: none; }
 .rail-btn {
   position: relative;
   width: 40px; height: 40px;
@@ -73,7 +72,6 @@
 .rail-btn .dot[data-state="working"] { background: var(--accent); }
 .rail-btn .dot[data-state="attention"] { background: var(--warn); }
 .rail-btn .dot[data-state="idle"] { background: var(--ink-4); }
-.rail-spacer { flex: 1 1 auto; }
 
 /* ---- sidebar */
 .sidebar {

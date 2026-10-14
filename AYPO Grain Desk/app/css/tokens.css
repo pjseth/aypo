@@ -10,10 +10,11 @@
    hue, and a rising price is the coral. That is the opposite of a trading screen
    and it is deliberate.
 
-   Three theme states are handled: bare :root is the full light palette, the
-   media query covers the un-stamped system-dark viewer, and [data-theme] wins
-   both ways for the explicit toggle. No colour is defined only inside a media
-   or [data-theme] block.
+   One palette, light, declared once on bare :root — the references are light,
+   the desk is read in a lit office, and a second palette is a second set of
+   contrast decisions to keep honest for no one who asked. `color-scheme: light`
+   tells the browser to paint its own furniture (scrollbars, form controls) to
+   match rather than inverting it on a dark-mode machine.
 */
 
 :root {
@@ -120,126 +121,6 @@
   --strip-h: 60px;
 
   color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --ground:        #0d0f13;
-    --ground-2:      #121519;
-    --surface:       #171a20;
-    --surface-2:     #1d2128;
-    --surface-3:     #232830;
-    --rail:          #121519;
-    --sidebar:       #141720;
-    --overlay:       rgba(0, 0, 0, 0.62);
-
-    --border:        #272c35;
-    --border-2:      #333945;
-    --border-strong: #454d5c;
-
-    --ink:           #e9ebef;
-    --ink-2:         #b2b8c2;
-    --ink-3:         #848b97;
-    --ink-4:         #666d7a;
-    --on-accent:     #06120e;
-    --on-accent-2:   rgba(6, 18, 14, 0.78);
-    --on-accent-3:   rgba(6, 18, 14, 0.62);
-    --on-accent-wash: rgba(0, 0, 0, 0.10);
-    --on-accent-line: rgba(6, 18, 14, 0.16);
-    --on-black:      #11131a;
-
-    --accent:        #2fb48c;
-    --accent-2:      #52c7a3;
-    --accent-3:      #1d8a69;
-    --accent-soft:   rgba(47, 180, 140, 0.14);
-    --accent-line:   rgba(47, 180, 140, 0.34);
-    --black:         #e9ebef;
-    --black-hover:   #cfd4dc;
-
-    --down:          #2fb48c;
-    --down-soft:     rgba(47, 180, 140, 0.14);
-    --up:            #e2715a;
-    --up-soft:       rgba(226, 113, 90, 0.15);
-    --warn:          #d99c3c;
-    --warn-soft:     rgba(217, 156, 60, 0.15);
-    --info:          #6b9bd2;
-    --info-soft:     rgba(107, 155, 210, 0.15);
-    --neutral-soft:  #232830;
-
-    --c-futures:     #6b9bd2;
-    --c-basis:       #2fb48c;
-    --c-freight:     #d9a44c;
-    --c-margin:      #cd6e5c;
-    --c-residual:    #767d8a;
-
-    --sh-xs:  0 0 0 1px rgba(255, 255, 255, 0.05);
-    --sh-sm:  0 0 0 1px rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.34);
-    --sh-md:  0 2px 4px -1px rgba(0, 0, 0, 0.40), 0 6px 14px -4px rgba(0, 0, 0, 0.44);
-    --sh-lg:  0 10px 28px -6px rgba(0, 0, 0, 0.56), 0 2px 6px -1px rgba(0, 0, 0, 0.36);
-    --sh-pop: 0 20px 56px -16px rgba(0, 0, 0, 0.72), 0 4px 12px -4px rgba(0, 0, 0, 0.44);
-    --sh-ring: 0 0 0 3px rgba(47, 180, 140, 0.26);
-
-    color-scheme: dark;
-  }
-}
-
-:root[data-theme="dark"] {
-  --ground:        #0d0f13;
-  --ground-2:      #121519;
-  --surface:       #171a20;
-  --surface-2:     #1d2128;
-  --surface-3:     #232830;
-  --rail:          #121519;
-  --sidebar:       #141720;
-  --overlay:       rgba(0, 0, 0, 0.62);
-
-  --border:        #272c35;
-  --border-2:      #333945;
-  --border-strong: #454d5c;
-
-  --ink:           #e9ebef;
-  --ink-2:         #b2b8c2;
-  --ink-3:         #848b97;
-  --ink-4:         #666d7a;
-  --on-accent:     #06120e;
-  --on-accent-2:   rgba(6, 18, 14, 0.78);
-  --on-accent-3:   rgba(6, 18, 14, 0.62);
-  --on-accent-wash: rgba(0, 0, 0, 0.10);
-  --on-accent-line: rgba(6, 18, 14, 0.16);
-  --on-black:      #11131a;
-
-  --accent:        #2fb48c;
-  --accent-2:      #52c7a3;
-  --accent-3:      #1d8a69;
-  --accent-soft:   rgba(47, 180, 140, 0.14);
-  --accent-line:   rgba(47, 180, 140, 0.34);
-  --black:         #e9ebef;
-  --black-hover:   #cfd4dc;
-
-  --down:          #2fb48c;
-  --down-soft:     rgba(47, 180, 140, 0.14);
-  --up:            #e2715a;
-  --up-soft:       rgba(226, 113, 90, 0.15);
-  --warn:          #d99c3c;
-  --warn-soft:     rgba(217, 156, 60, 0.15);
-  --info:          #6b9bd2;
-  --info-soft:     rgba(107, 155, 210, 0.15);
-  --neutral-soft:  #232830;
-
-  --c-futures:     #6b9bd2;
-  --c-basis:       #2fb48c;
-  --c-freight:     #d9a44c;
-  --c-margin:      #cd6e5c;
-  --c-residual:    #767d8a;
-
-  --sh-xs:  0 0 0 1px rgba(255, 255, 255, 0.05);
-  --sh-sm:  0 0 0 1px rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.34);
-  --sh-md:  0 2px 4px -1px rgba(0, 0, 0, 0.40), 0 6px 14px -4px rgba(0, 0, 0, 0.44);
-  --sh-lg:  0 10px 28px -6px rgba(0, 0, 0, 0.56), 0 2px 6px -1px rgba(0, 0, 0, 0.36);
-  --sh-pop: 0 20px 56px -16px rgba(0, 0, 0, 0.72), 0 4px 12px -4px rgba(0, 0, 0, 0.44);
-  --sh-ring: 0 0 0 3px rgba(47, 180, 140, 0.26);
-
-  color-scheme: dark;
 }
 
 /* --------------------------------------------------------------------- reset */

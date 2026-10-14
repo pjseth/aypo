@@ -167,7 +167,7 @@
   /* ------------------------------------------------------------- small pieces */
 
   /* Hatching, not a flat fill: the band is an estimate and should not read like a
-     measured block. Both stops are theme tokens, so it survives light and dark. */
+     measured block. Both stops are palette tokens, never literals. */
   var HATCH = "repeating-linear-gradient(135deg, var(--border-2) 0 4px, var(--surface) 4px 9px)";
 
   /* A callout. `tone`: "mute" (default) or "accent". Deliberately not alarming —

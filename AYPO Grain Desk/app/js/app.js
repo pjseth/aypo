@@ -6,30 +6,9 @@
   var el = GD.el, icon = GD.icon, qs = GD.qs, qsa = GD.qsa, fmt = GD.fmt;
   var D = window.DESK;
 
-  /* --------------------------------------------------------------- theme */
-
-  var THEME_KEY = "graindesk-theme";
-  function storedTheme() {
-    try { return localStorage.getItem(THEME_KEY); } catch (e) { return null; }
-  }
-  function setTheme(t) {
-    if (t) document.documentElement.setAttribute("data-theme", t);
-    else document.documentElement.removeAttribute("data-theme");
-    try { if (t) localStorage.setItem(THEME_KEY, t); else localStorage.removeItem(THEME_KEY); }
-    catch (e) { /* private window — the page still works, it just will not remember */ }
-  }
-  function currentTheme() {
-    var set = document.documentElement.getAttribute("data-theme");
-    if (set) return set;
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  }
-  /* The three reference designs are all light, and the desk is read in a lit
-     office, so light is what a first-time visitor gets regardless of what the OS
-     is set to. It is stamped, not stored: once the viewer picks a side with the
-     rail toggle that choice is remembered and wins from then on. */
-  var stored = storedTheme();
-  if (stored) setTheme(stored);
-  else document.documentElement.setAttribute("data-theme", "light");
+  /* The desk is light only. The three reference designs are light, it is read in
+     a lit office, and one palette is one palette to keep honest — so there is no
+     theme state, no toggle and nothing stored. */
 
   /* ------------------------------------------------------- agents in rail */
 
@@ -95,21 +74,6 @@
       rail.appendChild(btn);
     });
 
-    rail.appendChild(el("div", { class: "rail-spacer" }));
-    rail.appendChild(el("div", { class: "rail-sep" }));
-
-    var themeBtn = el("button", {
-      class: "rail-btn", type: "button", "aria-label": "Switch theme",
-      onclick: function () {
-        var next = currentTheme() === "dark" ? "light" : "dark";
-        setTheme(next);
-        GD.clear(themeBtn);
-        themeBtn.appendChild(icon(next === "dark" ? "sun" : "moon", 17, 1.6));
-        GD.toast(next === "dark" ? "Dark theme" : "Light theme", { icon: next === "dark" ? "moon" : "sun" });
-      }
-    }, [icon(currentTheme() === "dark" ? "sun" : "moon", 17, 1.6)]);
-    GD.tipOn(themeBtn, "Switch theme");
-    rail.appendChild(themeBtn);
     return rail;
   }
 
@@ -334,11 +298,6 @@
     out.push({
       group: "Actions", label: "Replay the WASDE alert", icon: "zap", hint: "Night Watch",
       run: function () { GD.nightWatch(); }
-    });
-    out.push({
-      group: "Actions", label: "Switch theme", icon: currentTheme() === "dark" ? "sun" : "moon",
-      hint: currentTheme() === "dark" ? "to light" : "to dark",
-      run: function () { setTheme(currentTheme() === "dark" ? "light" : "dark"); location.reload(); }
     });
     D.quotes.slice().sort(function (a, b) { return a.received < b.received ? 1 : -1; })
       .slice(0, 12).forEach(function (q) {
