@@ -13,3 +13,5 @@ app/_shots/
 app/_probe_*.html
 app/_shell*.png
 _jscheck.html
+.claude/
+app/_*.html

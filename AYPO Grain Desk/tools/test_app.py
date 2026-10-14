@@ -101,7 +101,7 @@ def render(url, shot=None):
     else:
         cmd += ["--dump-dom"]
     cmd.append(url)
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=240)
     return r.stdout or "", r.stderr or ""
 
 

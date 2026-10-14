@@ -712,3 +712,37 @@ tbody tr:hover .row-actions, tbody tr:focus-within .row-actions { opacity: 1; }
   animation-delay: calc(var(--i, 0) * 45ms);
 }
 @keyframes rise { from { opacity: 0; transform: translateY(5px); } }
+
+/* --- polish pass -------------------------------------------------------- */
+
+/* Optical padding: a button whose first child is an icon gets 2px less on the
+   icon side, because a glyph reads lighter than a cap-height letter. */
+.btn:has(> svg:first-child) { padding-left: 10px; }
+.btn:has(> svg:last-child)  { padding-right: 10px; }
+
+/* Contextual icon swap without a motion library: both glyphs stay in the DOM,
+   one absolutely positioned, and they cross-fade on the shared easing.
+   scale 0.25 -> 1, opacity 0 -> 1, blur 4px -> 0, exactly as prescribed. */
+.swap { position: relative; display: grid; place-items: center; }
+.swap > svg {
+  grid-area: 1 / 1;
+  transition-property: opacity, transform, filter;
+  transition-duration: var(--d-base);
+  transition-timing-function: var(--ease);
+}
+.swap > svg[data-on="false"] {
+  opacity: 0; transform: scale(0.25); filter: blur(4px); pointer-events: none;
+}
+.swap > svg[data-on="true"] { opacity: 1; transform: none; filter: blur(0); }
+
+/* Card elevation on hover gets its own transition, not a shared one. */
+.card.is-hoverable {
+  transition-property: box-shadow, border-color;
+  transition-duration: 150ms;
+  transition-timing-function: var(--ease);
+}
+.card.is-hoverable:hover { box-shadow: var(--sh-md); border-color: var(--border-2); }
+
+/* A chart reveals once per data load, never on hover or re-render. */
+@keyframes draw-in { from { opacity: 0; } }
+.chart-reveal { animation: draw-in var(--d-slow) var(--ease) both; }

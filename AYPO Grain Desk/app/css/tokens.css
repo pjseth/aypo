@@ -157,8 +157,8 @@
     --c-margin:      #cd6e5c;
     --c-residual:    #767d8a;
 
-    --sh-xs:  0 1px 1px rgba(0, 0, 0, 0.30);
-    --sh-sm:  0 1px 2px rgba(0, 0, 0, 0.36), 0 1px 1px rgba(0, 0, 0, 0.22);
+    --sh-xs:  0 0 0 1px rgba(255, 255, 255, 0.05);
+    --sh-sm:  0 0 0 1px rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.34);
     --sh-md:  0 2px 4px -1px rgba(0, 0, 0, 0.40), 0 6px 14px -4px rgba(0, 0, 0, 0.44);
     --sh-lg:  0 10px 28px -6px rgba(0, 0, 0, 0.56), 0 2px 6px -1px rgba(0, 0, 0, 0.36);
     --sh-pop: 0 20px 56px -16px rgba(0, 0, 0, 0.72), 0 4px 12px -4px rgba(0, 0, 0, 0.44);
@@ -213,8 +213,8 @@
   --c-margin:      #cd6e5c;
   --c-residual:    #767d8a;
 
-  --sh-xs:  0 1px 1px rgba(0, 0, 0, 0.30);
-  --sh-sm:  0 1px 2px rgba(0, 0, 0, 0.36), 0 1px 1px rgba(0, 0, 0, 0.22);
+  --sh-xs:  0 0 0 1px rgba(255, 255, 255, 0.05);
+  --sh-sm:  0 0 0 1px rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.34);
   --sh-md:  0 2px 4px -1px rgba(0, 0, 0, 0.40), 0 6px 14px -4px rgba(0, 0, 0, 0.44);
   --sh-lg:  0 10px 28px -6px rgba(0, 0, 0, 0.56), 0 2px 6px -1px rgba(0, 0, 0, 0.36);
   --sh-pop: 0 20px 56px -16px rgba(0, 0, 0, 0.72), 0 4px 12px -4px rgba(0, 0, 0, 0.44);

@@ -101,7 +101,7 @@ def render(url, timeout=180):
     r = subprocess.run(
         [EDGE, "--headless=new", "--disable-gpu", "--no-sandbox",
          "--virtual-time-budget=8000", "--dump-dom", url],
-        capture_output=True, text=True, timeout=timeout,
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
     )
     dom = r.stdout or ""
     m = re.search(r"<title>(.*?)</title>", dom, re.S)
