@@ -1,0 +1,292 @@
+/* Grain Desk — design tokens
+   ---------------------------------------------------------------------------
+   The palette is sampled from three reference dashboards, not invented:
+     · cool lavender ground + emerald accent  — SPN solar monitoring (#e3e4ed, #049772)
+     · black pill primary + hairline structure — Microdose billing (#1b1b1c, #e4e1e2)
+     · elevated-white active nav + chip language — FlowAI (#fdfdfd on #efefef)
+
+   The emerald earns its place twice: it is the reference accent, and in a buying
+   desk a falling price is the good outcome — so "good" and "accent" are the same
+   hue, and a rising price is the coral. That is the opposite of a trading screen
+   and it is deliberate.
+
+   Three theme states are handled: bare :root is the full light palette, the
+   media query covers the un-stamped system-dark viewer, and [data-theme] wins
+   both ways for the explicit toggle. No colour is defined only inside a media
+   or [data-theme] block.
+*/
+
+:root {
+  /* ---- ground & surfaces */
+  --ground:        #e9ebf0;
+  --ground-2:      #f2f4f7;
+  --surface:       #ffffff;
+  --surface-2:     #f5f7fa;
+  --surface-3:     #eef1f6;
+  --rail:          #fbfbfd;
+  --sidebar:       #fafbfc;
+  --overlay:       rgba(20, 24, 31, 0.44);
+
+  /* ---- structure */
+  --border:        #e3e6ec;
+  --border-2:      #d4d9e2;
+  --border-strong: #b9c0cd;
+
+  /* ---- ink */
+  --ink:           #1a1d23;
+  --ink-2:         #4d535d;
+  --ink-3:         #868d99;
+  --ink-4:         #a8aeb9;
+  --on-accent:     #ffffff;
+  --on-black:      #ffffff;
+
+  /* ---- brand / accent */
+  --accent:        #049772;
+  --accent-2:      #03775a;
+  --accent-3:      #47b299;
+  --accent-soft:   #e4f3ee;
+  --accent-line:   rgba(4, 151, 114, 0.28);
+  --black:         #1b1b1c;
+  --black-hover:   #303033;
+
+  /* ---- semantics, from the buyer's side: down is good */
+  --down:          #049772;   /* price fell — cheaper to buy */
+  --down-soft:     #e4f3ee;
+  --up:            #cf5440;   /* price rose — costs us */
+  --up-soft:       #fbeae6;
+  --warn:          #c8872a;
+  --warn-soft:     #fbf1e0;
+  --info:          #3a6ea8;
+  --info-soft:     #e8eff7;
+  --neutral-soft:  #eef0f4;
+
+  /* ---- categorical: the four components of a quoted price.
+         Every hue below appears in one of the three reference designs. */
+  --c-futures:     #3a6ea8;
+  --c-basis:       #049772;
+  --c-freight:     #d9932f;
+  --c-margin:      #b14c3f;
+  --c-residual:    #9aa1ae;
+
+  /* ---- type */
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --t-display: 26px;
+  --t-title:   19px;
+  --t-head:    15px;
+  --t-body:    13.5px;
+  --t-sm:      12.5px;
+  --t-xs:      11.5px;
+  --t-label:   10.5px;
+
+  /* ---- radii. Concentric: a child sits at parent − its own padding. */
+  --r-window: 18px;
+  --r-card:   14px;
+  --r-inner:  10px;
+  --r-ctl:    8px;
+  --r-chip:   6px;
+  --r-pill:   999px;
+
+  /* ---- elevation. Borders carry structure; shadows carry depth. */
+  --sh-xs:  0 1px 1px rgba(17, 24, 39, 0.04);
+  --sh-sm:  0 1px 2px rgba(17, 24, 39, 0.05), 0 1px 1px rgba(17, 24, 39, 0.03);
+  --sh-md:  0 2px 4px -1px rgba(17, 24, 39, 0.05), 0 6px 14px -4px rgba(17, 24, 39, 0.07);
+  --sh-lg:  0 10px 28px -6px rgba(17, 24, 39, 0.12), 0 2px 6px -1px rgba(17, 24, 39, 0.05);
+  --sh-pop: 0 20px 56px -16px rgba(17, 24, 39, 0.26), 0 4px 12px -4px rgba(17, 24, 39, 0.10);
+  --sh-ring: 0 0 0 3px rgba(4, 151, 114, 0.18);
+
+  /* ---- motion. One easing for everything interactive. */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --d-fast: 120ms;
+  --d-base: 180ms;
+  --d-slow: 260ms;
+
+  /* ---- metrics */
+  --rail-w: 56px;
+  --side-w: 236px;
+  --top-h: 56px;
+  --strip-h: 54px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:        #0d0f13;
+    --ground-2:      #121519;
+    --surface:       #171a20;
+    --surface-2:     #1d2128;
+    --surface-3:     #232830;
+    --rail:          #121519;
+    --sidebar:       #141720;
+    --overlay:       rgba(0, 0, 0, 0.62);
+
+    --border:        #272c35;
+    --border-2:      #333945;
+    --border-strong: #454d5c;
+
+    --ink:           #e9ebef;
+    --ink-2:         #b2b8c2;
+    --ink-3:         #848b97;
+    --ink-4:         #666d7a;
+    --on-accent:     #06120e;
+    --on-black:      #11131a;
+
+    --accent:        #2fb48c;
+    --accent-2:      #52c7a3;
+    --accent-3:      #1d8a69;
+    --accent-soft:   rgba(47, 180, 140, 0.14);
+    --accent-line:   rgba(47, 180, 140, 0.34);
+    --black:         #e9ebef;
+    --black-hover:   #cfd4dc;
+
+    --down:          #2fb48c;
+    --down-soft:     rgba(47, 180, 140, 0.14);
+    --up:            #e2715a;
+    --up-soft:       rgba(226, 113, 90, 0.15);
+    --warn:          #d99c3c;
+    --warn-soft:     rgba(217, 156, 60, 0.15);
+    --info:          #6b9bd2;
+    --info-soft:     rgba(107, 155, 210, 0.15);
+    --neutral-soft:  #232830;
+
+    --c-futures:     #6b9bd2;
+    --c-basis:       #2fb48c;
+    --c-freight:     #d9a44c;
+    --c-margin:      #cd6e5c;
+    --c-residual:    #767d8a;
+
+    --sh-xs:  0 1px 1px rgba(0, 0, 0, 0.30);
+    --sh-sm:  0 1px 2px rgba(0, 0, 0, 0.36), 0 1px 1px rgba(0, 0, 0, 0.22);
+    --sh-md:  0 2px 4px -1px rgba(0, 0, 0, 0.40), 0 6px 14px -4px rgba(0, 0, 0, 0.44);
+    --sh-lg:  0 10px 28px -6px rgba(0, 0, 0, 0.56), 0 2px 6px -1px rgba(0, 0, 0, 0.36);
+    --sh-pop: 0 20px 56px -16px rgba(0, 0, 0, 0.72), 0 4px 12px -4px rgba(0, 0, 0, 0.44);
+    --sh-ring: 0 0 0 3px rgba(47, 180, 140, 0.26);
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:        #0d0f13;
+  --ground-2:      #121519;
+  --surface:       #171a20;
+  --surface-2:     #1d2128;
+  --surface-3:     #232830;
+  --rail:          #121519;
+  --sidebar:       #141720;
+  --overlay:       rgba(0, 0, 0, 0.62);
+
+  --border:        #272c35;
+  --border-2:      #333945;
+  --border-strong: #454d5c;
+
+  --ink:           #e9ebef;
+  --ink-2:         #b2b8c2;
+  --ink-3:         #848b97;
+  --ink-4:         #666d7a;
+  --on-accent:     #06120e;
+  --on-black:      #11131a;
+
+  --accent:        #2fb48c;
+  --accent-2:      #52c7a3;
+  --accent-3:      #1d8a69;
+  --accent-soft:   rgba(47, 180, 140, 0.14);
+  --accent-line:   rgba(47, 180, 140, 0.34);
+  --black:         #e9ebef;
+  --black-hover:   #cfd4dc;
+
+  --down:          #2fb48c;
+  --down-soft:     rgba(47, 180, 140, 0.14);
+  --up:            #e2715a;
+  --up-soft:       rgba(226, 113, 90, 0.15);
+  --warn:          #d99c3c;
+  --warn-soft:     rgba(217, 156, 60, 0.15);
+  --info:          #6b9bd2;
+  --info-soft:     rgba(107, 155, 210, 0.15);
+  --neutral-soft:  #232830;
+
+  --c-futures:     #6b9bd2;
+  --c-basis:       #2fb48c;
+  --c-freight:     #d9a44c;
+  --c-margin:      #cd6e5c;
+  --c-residual:    #767d8a;
+
+  --sh-xs:  0 1px 1px rgba(0, 0, 0, 0.30);
+  --sh-sm:  0 1px 2px rgba(0, 0, 0, 0.36), 0 1px 1px rgba(0, 0, 0, 0.22);
+  --sh-md:  0 2px 4px -1px rgba(0, 0, 0, 0.40), 0 6px 14px -4px rgba(0, 0, 0, 0.44);
+  --sh-lg:  0 10px 28px -6px rgba(0, 0, 0, 0.56), 0 2px 6px -1px rgba(0, 0, 0, 0.36);
+  --sh-pop: 0 20px 56px -16px rgba(0, 0, 0, 0.72), 0 4px 12px -4px rgba(0, 0, 0, 0.44);
+  --sh-ring: 0 0 0 3px rgba(47, 180, 140, 0.26);
+
+  color-scheme: dark;
+}
+
+/* --------------------------------------------------------------------- reset */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--t-body);
+  line-height: 1.45;
+  /* crisper text on macOS, per the polish skill */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+h1, h2, h3, h4, p, figure, dl, dd { margin: 0; }
+h1, h2, h3, h4 { font-weight: 600; text-wrap: balance; letter-spacing: -0.012em; }
+p { text-wrap: pretty; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+}
+button { background: none; border: 0; cursor: pointer; }
+
+svg { display: block; }
+img { max-width: 100%; display: block; }
+
+/* Every number that can change gets equal-width digits so nothing reflows. */
+.num, table td, .stat-value, .ticker-value { font-variant-numeric: tabular-nums; }
+
+a { color: var(--accent-2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-ctl);
+}
+
+/* Scrollbars, so the dense surfaces do not get a chrome-grey gutter. */
+* { scrollbar-width: thin; scrollbar-color: var(--border-2) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-2);
+  border-radius: var(--r-pill);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--border-strong); background-clip: content-box; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

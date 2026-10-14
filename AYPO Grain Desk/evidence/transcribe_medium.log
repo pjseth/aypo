@@ -1,0 +1,48 @@
+model   : medium.en (cpu, int8, 22 threads)
+audio   : evidence/audio.wav
+Xet Storage is enabled for this repo, but the 'hf_xet' package is not installed. Falling back to regular HTTP download. For better performance, install the package with: `pip install huggingface_hub[hf_xet]` or `pip install hf_xet`
+C:\Users\pjset\AppData\Local\Programs\Python\Python311\Lib\site-packages\huggingface_hub\file_download.py:143: UserWarning: `huggingface_hub` cache-system uses symlinks by default to efficiently store duplicated files but your machine does not support them in C:\Users\pjset\.cache\huggingface\hub\models--Systran--faster-whisper-medium.en. Caching files will still work but in a degraded version that might require more space on your disk. This warning can be disabled by setting the `HF_HUB_DISABLE_SYMLINKS_WARNING` environment variable. For more details, see https://huggingface.co/docs/huggingface_hub/how-to-cache#limitations.
+To support symlinks on Windows, you either need to activate Developer Mode or to run Python as an administrator. In order to activate developer mode, see this article: https://docs.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development
+  warnings.warn(message)
+loaded in 48.4s
+detected language: en (p=1.00)
+audio duration   : 4249.0s
+  02:07 transcribed (1.0x realtime, 124s elapsed)
+  04:12 transcribed (1.3x realtime, 190s elapsed)
+  06:18 transcribed (1.5x realtime, 245s elapsed)
+  08:21 transcribed (1.6x realtime, 315s elapsed)
+  10:25 transcribed (1.7x realtime, 373s elapsed)
+  12:26 transcribed (1.7x realtime, 447s elapsed)
+  14:28 transcribed (1.7x realtime, 510s elapsed)
+  16:33 transcribed (1.7x realtime, 578s elapsed)
+  18:40 transcribed (1.7x realtime, 654s elapsed)
+  20:44 transcribed (1.7x realtime, 725s elapsed)
+  22:49 transcribed (1.8x realtime, 779s elapsed)
+  24:55 transcribed (1.8x realtime, 845s elapsed)
+  26:57 transcribed (1.8x realtime, 919s elapsed)
+  28:58 transcribed (1.8x realtime, 982s elapsed)
+  31:00 transcribed (1.8x realtime, 1059s elapsed)
+  33:08 transcribed (1.8x realtime, 1120s elapsed)
+  35:12 transcribed (1.8x realtime, 1195s elapsed)
+  37:13 transcribed (1.8x realtime, 1273s elapsed)
+  39:16 transcribed (1.8x realtime, 1331s elapsed)
+  41:21 transcribed (1.8x realtime, 1406s elapsed)
+  43:24 transcribed (1.8x realtime, 1486s elapsed)
+  45:28 transcribed (1.7x realtime, 1565s elapsed)
+  47:31 transcribed (1.8x realtime, 1622s elapsed)
+  49:40 transcribed (1.8x realtime, 1697s elapsed)
+  51:40 transcribed (1.8x realtime, 1769s elapsed)
+  53:43 transcribed (1.7x realtime, 1850s elapsed)
+  55:46 transcribed (1.8x realtime, 1907s elapsed)
+  57:49 transcribed (1.7x realtime, 1989s elapsed)
+  59:49 transcribed (1.8x realtime, 2048s elapsed)
+  01:01:51 transcribed (1.8x realtime, 2116s elapsed)
+  01:03:52 transcribed (1.7x realtime, 2198s elapsed)
+  01:05:53 transcribed (1.7x realtime, 2272s elapsed)
+  01:07:56 transcribed (1.7x realtime, 2337s elapsed)
+  01:09:57 transcribed (1.7x realtime, 2424s elapsed)
+
+segments : 648
+words    : 10378
+elapsed  : 2433s (1.7x realtime)
+written  : evidence\transcript.jsonl, evidence\transcript.md

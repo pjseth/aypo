@@ -1,0 +1,1199 @@
+<title>Grain Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  --ground:#f5f6f3;
+  --surface:#fbfbf9;
+  --sunk:#eceee8;
+  --ink:#15191e;
+  --ink-2:#424a52;
+  --ink-3:#6d7680;
+  --rule:#d8dbd2;
+  --rule-strong:#b9bdb2;
+  --accent:#8a5f10;
+  --accent-wash:rgba(138,95,16,.10);
+  --harbour:#1f4a63;
+
+  /* The four components of a quoted price. This is the page's signature
+     motif, so the ramp is defined once and reused everywhere. */
+  --c-futures:#2f4b7c;
+  --c-basis:#8a5f10;
+  --c-freight:#246b63;
+  --c-margin:#8c4a33;
+  --c-unknown:#9aa0a6;
+
+  /* A buyer's semantics: price up is bad. */
+  --bad:#a33226;
+  --good:#1f6b3f;
+
+  --maxw:1160px;
+  --prose:67ch;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#121417;
+    --surface:#191c20;
+    --sunk:#1f2328;
+    --ink:#e9e7e2;
+    --ink-2:#b4b9bf;
+    --ink-3:#848b93;
+    --rule:#2c3137;
+    --rule-strong:#444b53;
+    --accent:#d3a042;
+    --accent-wash:rgba(211,160,66,.12);
+    --harbour:#79aecb;
+    --c-futures:#6d8cc4;
+    --c-basis:#d3a042;
+    --c-freight:#49a195;
+    --c-margin:#c47a5f;
+    --c-unknown:#747b83;
+    --bad:#e0766a;
+    --good:#5cb584;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#121417;
+  --surface:#191c20;
+  --sunk:#1f2328;
+  --ink:#e9e7e2;
+  --ink-2:#b4b9bf;
+  --ink-3:#848b93;
+  --rule:#2c3137;
+  --rule-strong:#444b53;
+  --accent:#d3a042;
+  --accent-wash:rgba(211,160,66,.12);
+  --harbour:#79aecb;
+  --c-futures:#6d8cc4;
+  --c-basis:#d3a042;
+  --c-freight:#49a195;
+  --c-margin:#c47a5f;
+  --c-unknown:#747b83;
+  --bad:#e0766a;
+  --good:#5cb584;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:"Source Serif 4",Georgia,"Times New Roman",serif;
+  font-size:17px;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+.prose{max-width:var(--prose)}
+
+h1,h2,h3,h4,.ui{font-family:Archivo,"Helvetica Neue",Arial,sans-serif}
+h2,h3,h4{text-wrap:balance}
+h2{font-size:30px;line-height:1.18;letter-spacing:-.016em;font-weight:700;margin:0 0 6px}
+h3{font-size:20px;line-height:1.28;letter-spacing:-.008em;font-weight:600;margin:38px 0 8px}
+h4{font-size:15px;font-weight:600;margin:26px 0 6px}
+p{margin:0 0 16px}
+a{color:var(--harbour)}
+strong{font-weight:600}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-variant-ligatures:none}
+
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+  margin:0 0 10px;
+}
+
+/* ---------- masthead ---------- */
+.mast{border-bottom:1px solid var(--rule);background:var(--surface)}
+.mast-in{display:flex;flex-direction:column;gap:22px;padding:56px 28px 40px;max-width:var(--maxw);margin:0 auto}
+h1{font-size:clamp(38px,6vw,64px);line-height:1.02;letter-spacing:-.03em;font-weight:700;margin:0}
+.lede{font-size:21px;line-height:1.5;color:var(--ink-2);max-width:60ch;margin:0}
+.kicker{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);
+}
+.meta{
+  display:flex;flex-wrap:wrap;gap:8px 20px;font-family:"IBM Plex Mono",monospace;
+  font-size:12px;color:var(--ink-3);border-top:1px solid var(--rule);padding-top:16px;
+}
+
+/* ---------- the money strip ---------- */
+.strip{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+  gap:1px;background:var(--rule);border:1px solid var(--rule);margin:0 0 4px;
+}
+.strip div{background:var(--surface);padding:16px 18px}
+.strip .k{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);display:block;margin-bottom:5px}
+.strip .v{font-family:Archivo,sans-serif;font-size:25px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;display:block;line-height:1.1}
+.strip .n{font-size:13px;color:var(--ink-3);line-height:1.4;display:block;margin-top:5px;font-family:"Source Serif 4",serif}
+
+section{padding:52px 0;border-top:1px solid var(--rule)}
+section:first-of-type{border-top:none}
+.sec-head{margin-bottom:26px}
+
+/* ---------- tables ---------- */
+.tbl-scroll{overflow-x:auto;margin:22px 0;border:1px solid var(--rule);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:620px}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--rule);vertical-align:top}
+thead th{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);font-weight:500;
+  background:var(--sunk);white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:none}
+td.num{font-variant-numeric:tabular-nums;font-family:"IBM Plex Mono",monospace;font-size:13px;white-space:nowrap}
+.dimrow{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-3);letter-spacing:.04em}
+.said{color:var(--ink-2);font-style:italic}
+
+/* ---------- quote blocks ---------- */
+blockquote{
+  margin:22px 0;padding:2px 0 2px 20px;border-left:2px solid var(--accent);
+  font-size:18px;line-height:1.5;color:var(--ink);
+}
+blockquote cite{
+  display:block;margin-top:9px;font-style:normal;font-family:"IBM Plex Mono",monospace;
+  font-size:11.5px;letter-spacing:.06em;color:var(--ink-3);
+}
+
+/* ---------- agents ---------- */
+.agents{display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);margin:26px 0}
+.agent{background:var(--surface);padding:18px 20px 20px}
+.agent .nm{font-family:Archivo,sans-serif;font-weight:600;font-size:16.5px;letter-spacing:-.01em;margin:0 0 2px;display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.agent .trig{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.agent p{font-size:14.5px;line-height:1.52;color:var(--ink-2);margin:8px 0 0}
+.agent .out{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-3);margin-top:10px;display:block;line-height:1.5}
+.tier{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;border:1px solid var(--rule-strong);color:var(--ink-3);white-space:nowrap}
+.tier.now{border-color:var(--accent);color:var(--accent);background:var(--accent-wash)}
+
+/* three-agent roster */
+.trio{display:grid;grid-template-columns:repeat(auto-fit,minmax(296px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);margin:26px 0}
+.trio .a{background:var(--surface);padding:24px 24px 26px;display:flex;flex-direction:column}
+.trio .q{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+.trio h3{margin:0 0 6px;font-size:24px;letter-spacing:-.016em}
+.trio .role{font-size:15.5px;line-height:1.45;color:var(--ink);margin:0 0 12px;font-weight:600}
+.trio p{font-size:14.5px;line-height:1.56;color:var(--ink-2);margin:0 0 14px}
+.trio dl{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;margin:0 0 14px;font-size:13px;align-items:baseline}
+.trio dt{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap}
+.trio dd{margin:0;color:var(--ink-2);line-height:1.45}
+.trio dd.mono{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3);line-height:1.55}
+.trio .folds{margin:auto 0 0;padding-top:14px;border-top:1px solid var(--rule);font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3);line-height:1.5}
+.trio .folds span{display:block;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+
+/* ---------- wireframes ---------- */
+figure{margin:30px 0}
+.wf{
+  background:var(--surface);border:1px solid var(--rule);padding:20px;overflow-x:auto;
+}
+.wf svg{display:block;width:100%;height:auto;min-width:560px;overflow:visible}
+figcaption{font-size:14px;color:var(--ink-3);margin-top:11px;line-height:1.5;max-width:68ch}
+figcaption b{color:var(--ink-2);font-weight:600}
+
+.p{fill:var(--sunk);stroke:var(--rule-strong);stroke-width:1}
+.pf{fill:var(--surface);stroke:var(--rule-strong);stroke-width:1}
+.hair{stroke:var(--rule);stroke-width:1}
+.lbl{fill:var(--ink-3);font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.07em;text-transform:uppercase}
+.txt{fill:var(--ink-2);font-family:Archivo,sans-serif;font-size:11px}
+.big{fill:var(--ink);font-family:Archivo,sans-serif;font-size:21px;font-weight:600}
+.huge{fill:var(--ink);font-family:Archivo,sans-serif;font-size:29px;font-weight:700}
+.dim{fill:var(--ink-3);font-family:Archivo,sans-serif;font-size:10px}
+.ghost{fill:var(--rule);}
+.acc{fill:var(--accent)}
+.badv{fill:var(--bad)}
+.goodv{fill:var(--good)}
+.note{fill:var(--accent);font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.05em}
+.lead{stroke:var(--accent);stroke-width:1;stroke-dasharray:2 2}
+
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:14px 0 0;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3)}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend i{width:11px;height:11px;display:inline-block;border-radius:2px}
+
+ul,ol{margin:0 0 16px;padding-left:22px}
+li{margin-bottom:7px}
+li::marker{color:var(--ink-3)}
+
+.callout{
+  border:1px solid var(--rule);border-left:3px solid var(--accent);
+  background:var(--surface);padding:18px 22px;margin:24px 0;
+}
+.callout p:last-child{margin-bottom:0}
+.callout .eyebrow{color:var(--accent)}
+
+.cols2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:30px}
+
+footer{border-top:1px solid var(--rule);background:var(--surface);padding:34px 0 60px;color:var(--ink-3);font-size:14px}
+
+@media (prefers-reduced-motion:no-preference){
+  a{transition:color .15s ease}
+}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+/* ---------- print / PDF ----------
+   Shared as a PDF, so this has to paginate like a document rather than a web page:
+   force the light palette regardless of the printing machine's theme, keep every
+   wireframe and table whole, and let the wide blocks shrink to the page instead of
+   scrolling, since there is nothing to scroll on paper. */
+@media print{
+  :root{
+    --ground:#fff; --surface:#fff; --sunk:#f3f4f0;
+    --ink:#101418; --ink-2:#3b434b; --ink-3:#616a73;
+    --rule:#ccd0c7; --rule-strong:#9aa093;
+    --accent:#7a5410; --accent-wash:rgba(122,84,16,.08);
+    --harbour:#1b4256;
+    --c-futures:#2f4b7c; --c-basis:#8a5f10; --c-freight:#246b63;
+    --c-margin:#8c4a33; --c-unknown:#9aa0a6;
+    --bad:#9c2f24; --good:#1d6239;
+  }
+  @page{size:A4;margin:14mm 13mm}
+  body{background:#fff;font-size:10.5pt;line-height:1.5}
+  .wrap{max-width:none;padding:0}
+  .mast{border-bottom:1.5px solid var(--rule-strong)}
+  .mast-in{padding:0 0 18px;max-width:none}
+  h1{font-size:34pt}
+  .lede{font-size:13pt}
+  h2{font-size:17pt}
+  h3{font-size:12pt}
+  section{padding:20px 0;break-inside:auto}
+  .sec-head{break-after:avoid}
+  h2,h3,h4{break-after:avoid}
+  figure,.wf,.callout,.agent,blockquote{break-inside:avoid}
+  .tbl-scroll{overflow:visible;break-inside:auto}
+  table{min-width:0;font-size:9pt}
+  th,td{padding:6px 8px}
+  .wf{padding:10px}
+  .wf svg{min-width:0}
+  .agents{break-inside:auto}
+  .strip{break-inside:avoid}
+  footer{break-inside:avoid}
+  a{color:var(--harbour);text-decoration:none}
+}
+</style>
+
+<header class="mast">
+  <div class="mast-in">
+    <p class="kicker">Product design · wheat procurement · United Flour Mill, Thailand</p>
+    <h1>Grain Desk</h1>
+    <p class="lede">A single source of truth for a flour mill's wheat buying — built around the
+      one number that decides it: what this cargo costs against what everyone else paid.</p>
+    <div class="meta">
+      <span>Design proposal, not a build</span>
+      <span>Source: 71-minute walkthrough with Pavin Sethbhakdi, 4 Oct 2026</span>
+      <span>Timestamps cite the recording</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+  <div class="sec-head prose">
+    <p class="eyebrow">Why the units matter</p>
+    <h2>Every number has to be legible in dollars per cargo</h2>
+  </div>
+  <div class="strip">
+    <div><span class="k">One cargo</span><span class="v">55,000 t</span><span class="n">US wheat, Supramax with gear, PNW to Koh Sichang</span></div>
+    <div><span class="k">At ~$350/t</span><span class="v">$19.25M</span><span class="n">Financed per vessel, 9–10 vessels a year</span></div>
+    <div><span class="k">A $5/t move</span><span class="v">$275,000</span><span class="n">"It can increase like that within a few days"</span></div>
+    <div><span class="k">Wheat as share of mill cost</span><span class="v">80%</span><span class="n">Procurement is most of the income statement</span></div>
+  </div>
+  <div class="prose">
+    <p>Pavin does not think in dollars per tonne. He converts, every time, into what a move costs
+      across a 55,000-tonne cargo — and then into the baht-per-kilo flour price he has to quote a
+      customer next quarter. A product that shows <span class="mono">$358/t</span> and stops there
+      is making him do the arithmetic that matters.</p>
+    <p><strong>Design rule: no price appears in one unit.</strong> Always $/t, $/cargo, and where
+      the chain reaches that far, ฿/kg of flour.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head prose">
+    <p class="eyebrow">What the recording showed that the notes did not</p>
+    <h2>He has already built four fifths of this in Excel</h2>
+  </div>
+  <div class="prose">
+    <p>The summary notes described fragmentation and a wish list. The screen-shares show something
+      more useful: a working system, assembled by hand, whose shape tells us exactly what to build.
+      Three corrections and one omission change the design.</p>
+  </div>
+
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>Where</th><th>What is actually on screen</th><th>What it changes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">18:42</td>
+          <td><b>wheat_price_template</b> on SharePoint — the Power Automate + Claude Sonnet output.
+            Columns: <span class="mono">date_received · supplier · origin · wheat_class ·
+            shipment_period · cnf_flat · cnf_basis · cnf_futures · fob_flat · fob_basis ·
+            fob_futures · qty_mt · protein_spec · spec_notes</span></td>
+          <td><b>cnf_basis and cnf_futures are nearly always empty</b> — 2 of ~25 rows. Suppliers
+            quote a flat number. The four-part decomposition is something he must reconstruct,
+            not something he receives.</td>
+        </tr>
+        <tr>
+          <td class="mono">53:19</td>
+          <td><b>PROCUREMENT TRACKER</b> — one tab per cargo, plus <span class="mono">Competitor
+            Prices</span> and <span class="mono">Procurement Notes</span> tabs. Vessel Pacific
+            Wind, origin PNW, Mitsui, contract 04-Jun-26.</td>
+          <td>Each cargo is split <b>70% flat / 30% basis</b>, and the basis portion is legged into
+            futures over weeks with Open/Filled orders against a take-profit of +$50,000 and a loss
+            cut of −$25,000. Nothing in the notes hinted at this.</td>
+        </tr>
+        <tr>
+          <td class="mono">17:52</td>
+          <td><b>Q426 Industrial Margin Analysis Pricing</b> — customers × SKU, ฿/kg ex-VAT,
+            margin %, and forward cost for four quarters. A <span class="mono">Seller</span> column
+            flips between UFM and MCF.</td>
+          <td>The selling side exists and is quarterly. Wheat cost becomes a customer price here.
+            A product that stops at the purchase stops one step short of the decision.</td>
+        </tr>
+        <tr>
+          <td class="mono">22:28</td>
+          <td><b>Presentation to Mitsui</b>: US ~3–4 ships/yr at ~55K mt; Australian ~3/yr at ~20K;
+            Canadian ~3/yr at ~15K — the latter two <b>combined across 7 mills</b>.</td>
+          <td>~9–10 cargoes a year, not 10–12. Supramax, not uniformly Panamax. And pooling is the
+            <b>normal structure</b>, not a fallback — UFM holds 20–40% of those cargoes.</td>
+        </tr>
+        <tr>
+          <td class="mono">40:32</td>
+          <td><b>(FINAL) DOCS_MV PACIFIC WIND_UFM.pdf</b> — 45 pages: Baltimore Form C bill of
+            lading, USDA phytosanitary certificate, commodity inspection, SGS.</td>
+          <td>Paperwork arrives as <b>one merged pack per vessel</b>, with certificates issued
+            <b>per hold</b>. The job is splitting and reconciling pages inside a PDF, not filing
+            attachments.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout prose">
+    <p class="eyebrow">The one that should worry us</p>
+    <p>The Mitsui email at <span class="mono">20:14</span> quotes five classes. The spreadsheet rows
+      it produced captured four — <span class="mono">NS14.0 = USD373.80</span> was dropped. His
+      existing automation already loses data silently, and he has no way to know. That is the
+      strongest argument for an intake agent that reports what it could not read instead of
+      quietly writing a row.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head prose">
+    <p class="eyebrow">The shape of the problem</p>
+    <h2>One loop, broken in six places</h2>
+  </div>
+  <div class="prose">
+    <p>Procurement at UFM is a single loop that runs about ten times a year. Each break in it is a
+      place where Pavin currently substitutes his own attention for a system.</p>
+  </div>
+
+  <figure>
+    <div class="wf">
+      <svg viewBox="0 0 980 300" role="img" aria-label="The procurement loop from market intelligence through quote, hedge, shipment, documents, to flour pricing, with six break points marked">
+        <!-- stages -->
+        <g>
+          <rect class="pf" x="8"   y="78" width="138" height="62"/>
+          <rect class="pf" x="170" y="78" width="138" height="62"/>
+          <rect class="pf" x="332" y="78" width="138" height="62"/>
+          <rect class="pf" x="494" y="78" width="138" height="62"/>
+          <rect class="pf" x="656" y="78" width="138" height="62"/>
+          <rect class="pf" x="818" y="78" width="154" height="62"/>
+        </g>
+        <g class="txt" text-anchor="middle">
+          <text x="77"  y="104">Market</text><text x="77"  y="119">intelligence</text>
+          <text x="239" y="104">Supplier</text><text x="239" y="119">quotes</text>
+          <text x="401" y="104">Price &amp;</text><text x="401" y="119">hedge</text>
+          <text x="563" y="104">Vessel</text><text x="563" y="119">&amp; cargo</text>
+          <text x="725" y="104">Documents</text><text x="725" y="119">&amp; discharge</text>
+          <text x="895" y="104">Flour price</text><text x="895" y="119">to customer</text>
+        </g>
+        <!-- arrows -->
+        <g stroke="var(--rule-strong)" stroke-width="1.5" fill="none">
+          <path d="M146 109 H168"/><path d="M308 109 H330"/><path d="M470 109 H492"/>
+          <path d="M632 109 H654"/><path d="M794 109 H816"/>
+        </g>
+        <g fill="var(--rule-strong)">
+          <path d="M168 109 l-7 -3.5 v7 z"/><path d="M330 109 l-7 -3.5 v7 z"/>
+          <path d="M492 109 l-7 -3.5 v7 z"/><path d="M654 109 l-7 -3.5 v7 z"/>
+          <path d="M816 109 l-7 -3.5 v7 z"/>
+        </g>
+        <!-- feedback -->
+        <path d="M895 142 V186 H77 V142" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <path d="M77 142 l-3.5 7 h7 z" fill="var(--rule-strong)"/>
+        <text class="lbl" x="486" y="200" text-anchor="middle">Next quarter's cost basis feeds the next purchase decision</text>
+
+        <!-- breaks -->
+        <g class="note" text-anchor="middle">
+          <text x="77"  y="46">10+ sources,</text><text x="77" y="58">read by hand</text>
+          <text x="239" y="46">10+ emails/day,</text><text x="239" y="58">parsed, lossy</text>
+          <text x="401" y="46">Excel ledger,</text><text x="401" y="58">one person</text>
+          <text x="563" y="46">7-mill co-load,</text><text x="563" y="58">tracked ad hoc</text>
+          <text x="725" y="46">45-page PDF</text><text x="725" y="58">per vessel</text>
+          <text x="895" y="46">Separate workbook,</text><text x="895" y="58">no link to cost</text>
+        </g>
+        <g stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 2">
+          <path d="M77 64 V76"/><path d="M239 64 V76"/><path d="M401 64 V76"/>
+          <path d="M563 64 V76"/><path d="M725 64 V76"/><path d="M895 64 V76"/>
+        </g>
+
+        <!-- latency band -->
+        <rect class="p" x="8" y="232" width="964" height="48"/>
+        <text class="lbl" x="22" y="252">Clock speed</text>
+        <g class="dim">
+          <text x="150" y="252">seconds</text>
+          <text x="300" y="252">minutes</text>
+          <text x="455" y="252">daily</text>
+          <text x="600" y="252">weeks</text>
+          <text x="745" y="252">per voyage</text>
+          <text x="880" y="252">quarterly</text>
+        </g>
+        <text class="dim" x="22" y="270">A single product spans six different clock speeds — the reason one dashboard cannot be one refresh rate.</text>
+      </svg>
+    </div>
+    <figcaption>The loop, with the six places it currently breaks. <b>The clock speeds are the
+      design constraint:</b> a WASDE release is worth minutes, a quote is worth hours, a document
+      pack is worth a voyage. Any surface that refreshes everything at one rate is wrong for five
+      of the six.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="sec-head prose">
+    <p class="eyebrow">Needs he named</p>
+    <h2>What he asked for, and what answers it</h2>
+  </div>
+  <div class="prose">
+    <p>Seven needs came directly from Pavin. Two more we are proposing, marked as ours — he did not
+      ask for them, and they should be presented to him as proposals rather than requirements.
+      All nine are delivered by three agents, set out in the next section.</p>
+  </div>
+
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th style="width:3%"></th><th style="width:34%">What he said</th><th style="width:40%">What we build</th><th style="width:23%">Why it bites</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">N1</td>
+          <td class="said">"It's just back and forth emails to negotiate on the prices… I'm shocked
+            it's all done on email." <span class="mono">[17:33]</span></td>
+          <td><b>Quote Board.</b> Ingest from the <span class="mono">Price Indications</span>
+            Outlook folder that already exists (125 items), plus WhatsApp. One email fans out to ~7
+            rows, one per class. Supersede chains for corrections and recalls. Staleness clock.
+            Comparison on a laid-in basis, never on headline flat.</td>
+          <td>His own flow already drops quotes silently.</td>
+        </tr>
+        <tr>
+          <td class="mono">N2</td>
+          <td class="said">"That buys me literally five precious minutes to go influence the price…
+            before everyone else reads it." <span class="mono">[43:00]</span></td>
+          <td><b>Night Watch.</b> Pre-release expectation sheet, release-second polling, a verdict
+            per class within seconds, the impact priced per cargo, a push to his phone and a
+            pre-drafted message to Mitsui.</td>
+          <td>He physically stays awake for midnight Bangkok.</td>
+        </tr>
+        <tr>
+          <td class="mono">N3</td>
+          <td class="said">Futures tracked in a workbook he wrote himself; the head of procurement
+            keeps it in his head.</td>
+          <td><b>Position Book.</b> Models his sheet exactly: flat/basis split per cargo, contract
+            legs with Open/Filled status, mark-to-market against previous close, breakeven, and the
+            take-profit / loss-cut thresholds he already sets.</td>
+          <td>Key-person risk on a $19M position.</td>
+        </tr>
+        <tr>
+          <td class="mono">N4</td>
+          <td class="said">"This is all the paperwork that comes in. This isn't the fun part."
+            <span class="mono">[46:40]</span></td>
+          <td><b>Cargo File.</b> Split the 45-page vessel pack, classify each page, reconcile
+            per-hold quantities and quality certs against the GAFTA contract spec, and flag what is
+            missing before the vessel arrives.</td>
+          <td>Discrepancies become claims, and claims expire.</td>
+        </tr>
+        <tr>
+          <td class="mono">N5</td>
+          <td class="said">Weather, export demand, policy, FX, geopolitics — and a ~$1,500/month
+            consultancy for a weekly outlook.</td>
+          <td><b>Daily Brief.</b> Built on <em>his</em> causal model from OneNote — weather → crop
+            condition → production → supply, against seasonal and export demand, with Commitment of
+            Traders, government policy and forex acting on price. Each driver carries a direction, a
+            confidence and a $/t sensitivity.</td>
+          <td>He already reads a bearish/bullish deck daily.</td>
+        </tr>
+        <tr>
+          <td class="mono">N6</td>
+          <td class="said">"Their main thing is they want to help negotiate for you — be the
+            middleman between me and Mitsui… if they save $3 they take 50 cents."
+            <span class="mono">[36:11]</span></td>
+          <td><b>Negotiator.</b> Reconstruct the four components, estimate the margin embedded in a
+            flat quote, draft the counter with its justification, remember every concession per
+            supplier, and log the $/t saved.</td>
+          <td>This is the revenue model, see below.</td>
+        </tr>
+        <tr>
+          <td class="mono">N7</td>
+          <td class="said">Buying cheaper than the other Thai mills — the <span class="mono">Competitor
+            Prices</span> tab he maintains by hand.</td>
+          <td><b>Benchmark.</b> Peer laid-in cost estimated from Thai customs records, vessel
+            line-ups and the co-load cargoes UFM is already inside. Percentile rank per purchase,
+            and the alert he asked for: <em>locking this cargo puts you $X/t above peer basis.</em></td>
+          <td>The only KPI he actually named.</td>
+        </tr>
+        <tr>
+          <td class="mono">N8</td>
+          <td class="said"><b>Ours.</b> ~3 Australian and ~3 Canadian cargoes a year are shared
+            across 7 mills; UFM holds 20–40%.</td>
+          <td><b>Co-load view.</b> Tonnage commitments, partner shares, and the laycan each mill is
+            holding. Explicitly <em>not</em> a supplier marketplace, which he ruled out twice:
+            <span class="said">"these flour mills already have the contacts. I know them by name and
+            had drinks with them… it wouldn't be that much needed."</span> <span class="mono">[62:20]</span>
+            Buying is restricted to an approved supplier list anyway.</td>
+          <td>Pooling is routine, and invisible today.</td>
+        </tr>
+        <tr>
+          <td class="mono">N9</td>
+          <td class="said"><b>Ours.</b> Five classes across three origins get blended into the flour
+            grades priced in the margin workbook.</td>
+          <td><b>Blend &amp; margin bridge.</b> Least-cost blend meeting each grade's protein spec
+            at today's prices, carried through to ฿/kg cost per SKU and the margin on each
+            customer's quarterly offer.</td>
+          <td>Closes the loop to what the mill sells.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout prose">
+    <p class="eyebrow">The number that sets our price</p>
+    <p>On his own figures, the consultancy's success fee is <span class="mono">$0.50/t ×
+      55,000 t ≈ $27,500 a cargo</span> — call it <b>$275,000 a year</b> across ten cargoes, against
+      an $18,000 annual retainer. The Buyer is not competing with $1,500 a month. It is
+      competing with a quarter of a million dollars a year in success fees, which is also the
+      ceiling on what this product can credibly charge.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head prose">
+    <p class="eyebrow">The platform</p>
+    <h2>Three agents, one desk state</h2>
+  </div>
+  <div class="prose">
+    <p>An earlier draft of this document proposed ten agents. That was a list of capabilities
+      wearing costumes — ten things to build, ten things to explain, and no obvious answer to
+      "which one do I open?" Three is the real number, because there are only three questions
+      Pavin asks in a working week.</p>
+    <p>Each agent is specified the same way: a trigger, typed inputs, a typed output, a confidence
+      it is willing to state, and a named human who approves anything that leaves the building.
+      They write into one shared desk state and the surfaces render it.
+      <strong>Nothing contacts a supplier on its own.</strong></p>
+  </div>
+
+  <div class="trio">
+    <div class="a">
+      <p class="q">What should I pay?</p>
+      <h3>The Buyer</h3>
+      <p class="role">Turns a day of unstructured indications into one defensible counter-offer.</p>
+      <p>Reads each indication into structured rows — one per class, chained onto any quote it
+        corrects or recalls — and names the fields it could not read rather than guessing. Rebuilds
+        futures, basis and freight from the market so the flat price can be taken apart, and reports
+        the residual nobody itemised. Sets that against what the other eight approved suppliers are
+        showing, what this supplier has conceded before, and what the other Thai mills appear to
+        have paid. Then drafts the counter and the argument for it.</p>
+      <dl>
+        <dt>Trigger</dt><dd>On message arrival; on request before a counter</dd>
+        <dt>Emits</dt><dd class="mono">quote[] · unread_fields[] · components{futures,basis,freight} ·
+          residual_margin · peer_basis_est · counter_price · rationale[] · saved_$/t</dd>
+        <dt>Approval</dt><dd>Drafts only. Pavin sends.</dd>
+      </dl>
+      <p class="folds"><span>Folds in</span> Quote Clerk · Fair Value · Negotiator · Scout</p>
+    </div>
+
+    <div class="a">
+      <p class="q">When should I move?</p>
+      <h3>The Watch</h3>
+      <p class="role">Owns the clock — the release, the daily picture, and the position carried
+        against both.</p>
+      <p>Its sharpest mode is the one that wins the demo: at a WASDE or export-sales release it
+        holds a pre-release expectation sheet, diffs the print against it within seconds, scores
+        each class, prices the move against his actual open position and wakes him only if the
+        surprise clears a threshold he set. The rest of the week it writes the morning brief on his
+        own driver taxonomy, and keeps the position book — the 70/30 flat and basis split, the
+        contract legs with Open and Filled status, mark-to-market, breakeven, and the take-profit
+        and loss-cut levels he already sets by hand.</p>
+      <dl>
+        <dt>Trigger</dt><dd>Release times, to the second; daily 06:00 ICT; on fill; at settlement</dd>
+        <dt>Emits</dt><dd class="mono">verdict/class · surprise_vs_expected · $/t · $/cargo ·
+          driver[]{stance,confidence,$/t} · legs[] · mtm · breakeven · target_breach</dd>
+        <dt>Approval</dt><dd>Alerts freely. Orders never — it tells him to call Mitsui.</dd>
+      </dl>
+      <p class="folds"><span>Folds in</span> Night Watch · The Analyst · Position Keeper</p>
+    </div>
+
+    <div class="a">
+      <p class="q">Did I get what I bought?</p>
+      <h3>The Clerk</h3>
+      <p class="role">Follows the cargo from bill of lading to the baht-per-kilo it becomes.</p>
+      <p>Splits the 45-page vessel pack into its certificates, classifies each page, and reconciles
+        what the paperwork says against what the contract said — per-hold weights against the bill
+        of lading, protein and falling number against the GAFTA spec — raising a claim when they
+        disagree and flagging missing documents before the vessel berths. Then carries the landed
+        cost through the blend: the cheapest mix of the five classes that still meets each flour
+        grade's spec, priced through to ฿/kg per SKU and the margin on each customer's quarterly
+        offer.</p>
+      <dl>
+        <dt>Trigger</dt><dd>On document pack; on ETA countdown; on price move</dd>
+        <dt>Emits</dt><dd class="mono">page_class[] · completeness · spec_variance ·
+          claim_candidate · blend{class:%} · cost_฿/kg · margin_by_SKU</dd>
+        <dt>Approval</dt><dd>Raises claims for review. Never files one.</dd>
+      </dl>
+      <p class="folds"><span>Folds in</span> Cargo Clerk · Blender</p>
+    </div>
+  </div>
+
+  <div class="callout prose">
+    <p class="eyebrow">The tenth one was never an agent</p>
+    <p>"Desk Memory" — ask anything across every quote, message, document and decision — does not
+      become a fourth agent, and it does not belong inside any of the three. It is a
+      <strong>property of the shared record</strong>: if all three agents write sourced,
+      timestamped output into one store, asking questions of it is a query, not a colleague. Build
+      the store properly and the feature is free. Build three separate agent memories and no
+      amount of work buys it back.</p>
+    <p>That is the test for anything else proposed later: if it needs its own trigger and its own
+      judgement, it is an agent. If it only needs to read what the three already wrote, it is a
+      surface.</p>
+  </div>
+
+  <div class="callout prose">
+    <p class="eyebrow">Non-negotiable</p>
+    <p><b>Every agent output carries its provenance and is allowed to abstain.</b> Nobody commits
+      $19M on an unsourced number, and a parser that silently guesses is worse than one that says
+      what it could not read — we have the dropped <span class="mono">NS14.0</span> row to prove it.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head prose">
+    <p class="eyebrow">Surface 1 — the interrupt</p>
+    <h2>Night Watch</h2>
+  </div>
+  <div class="prose">
+    <p>This is not a page. It is an interrupt, designed for a man who is half asleep at midnight and
+      has about five minutes of advantage to spend. It must be readable in one glance, state the
+      consequence in money, and offer exactly one action.</p>
+    <blockquote>I literally wait until midnight on these days — or 2am, 1am if there's daylight
+      savings. As soon as it comes out, it's like waiting for your SAT score. You have to fat
+      finger, be very quick to click on this. "Oh, the file's not available yet." … You scroll down
+      to like page 11 or 12, and then — bam. You quickly call Mitsui: if you're in the market right
+      now, buy me this, sell these futures.
+      <cite>Pavin, 41:10 – 42:30</cite></blockquote>
+    <p>Four things in that passage are specification, not colour. The release lands at <b>midnight
+      or 2am Bangkok depending on US daylight saving</b>, so the schedule is not a fixed local time.
+      He is <b>manually refreshing a page for a PDF that is not there yet</b>. The wheat numbers he
+      needs are on <b>page 11 or 12</b> of a long document. And he already knows the answer:</p>
+    <blockquote>You have to have a thing that can instantly — an API that can pull this report out.
+      <cite>Pavin, 42:40</cite></blockquote>
+  </div>
+
+  <figure>
+    <div class="wf">
+      <svg viewBox="0 0 980 372" role="img" aria-label="Night Watch alert wireframe: a phone push notification beside a full-screen verdict panel showing per-class impact and a drafted supplier message">
+        <!-- phone -->
+        <rect class="pf" x="8" y="20" width="212" height="336" rx="18"/>
+        <rect class="p" x="22" y="56" width="184" height="124" rx="8"/>
+        <text class="lbl" x="34" y="74">Grain Desk · now</text>
+        <text class="big" x="34" y="94" style="font-size:13px">WASDE out — bearish HRW</text>
+        <text class="txt" x="34" y="112" style="font-size:10px">US ending stocks 1,912M bu</text>
+        <text class="txt" x="34" y="126" style="font-size:10px">+68 vs trade expectation</text>
+        <text class="huge badv" x="34" y="155" style="font-size:20px">−$231k</text>
+        <text class="txt" x="34" y="170" style="font-size:10px">on your March cargo</text>
+        <rect class="p" x="22" y="192" width="88" height="24" rx="4"/>
+        <text class="txt" x="66" y="208" text-anchor="middle">Open desk</text>
+        <rect class="p" x="118" y="192" width="88" height="24" rx="4"/>
+        <text class="txt" x="162" y="208" text-anchor="middle">Snooze</text>
+        <text class="lbl" x="22" y="238">Silent unless</text>
+        <text class="lbl" x="22" y="252">|surprise| &gt; threshold</text>
+        <text class="lbl" x="22" y="266">he sets per class</text>
+        <text class="note" x="22" y="296">00:00:08 after release</text>
+        <text class="dim" x="22" y="316">Phone, lock screen</text>
+
+        <!-- desk panel -->
+        <rect class="pf" x="244" y="20" width="728" height="336"/>
+        <line class="hair" x1="244" y1="62" x2="972" y2="62"/>
+        <text class="lbl" x="260" y="44">WASDE · October 2026 · released 00:00:02 ICT</text>
+        <text class="note" x="860" y="44">verdict in 8s</text>
+
+        <!-- verdict columns -->
+        <text class="lbl" x="260" y="86">Class</text>
+        <text class="lbl" x="392" y="86">Print vs expected</text>
+        <text class="lbl" x="580" y="86">Direction</text>
+        <text class="lbl" x="700" y="86">On your position</text>
+        <text class="lbl" x="860" y="86">Action</text>
+
+        <g class="txt">
+          <text x="260" y="112">HRW 11.5%</text>
+          <text x="260" y="146">NS/DNS 14.5%</text>
+          <text x="260" y="180">SWW 9–10.5%</text>
+        </g>
+        <g class="mono" style="font-size:11px" fill="var(--ink-2)" font-family="IBM Plex Mono">
+          <text x="392" y="112">stocks +68M bu</text>
+          <text x="392" y="146">stocks +12M bu</text>
+          <text x="392" y="180">exports −4%</text>
+        </g>
+        <!-- direction chips -->
+        <rect x="580" y="100" width="74" height="18" rx="2" fill="var(--good)" opacity="0.16"/>
+        <text class="txt goodv" x="590" y="113" style="font-size:10px">BEARISH ↓↓</text>
+        <rect x="580" y="134" width="74" height="18" rx="2" fill="var(--good)" opacity="0.10"/>
+        <text class="txt goodv" x="590" y="147" style="font-size:10px">BEARISH ↓</text>
+        <rect x="580" y="168" width="74" height="18" rx="2" fill="var(--bad)" opacity="0.12"/>
+        <text class="txt badv" x="590" y="181" style="font-size:10px">BULLISH ↑</text>
+
+        <g class="mono" style="font-size:12px" font-family="IBM Plex Mono">
+          <text class="badv" x="700" y="113">−$4.20/t  −$231k</text>
+          <text class="badv" x="700" y="147">−$1.10/t  −$61k</text>
+          <text class="goodv" x="700" y="181">+$0.90/t  +$49k</text>
+        </g>
+        <g class="note">
+          <text x="860" y="113">Call Mitsui</text>
+          <text x="860" y="147">Hold</text>
+          <text x="860" y="181">Hold</text>
+        </g>
+
+        <line class="hair" x1="260" y1="198" x2="956" y2="198"/>
+
+        <!-- draft message -->
+        <text class="lbl" x="260" y="222">Drafted, not sent</text>
+        <rect class="p" x="260" y="232" width="420" height="96" rx="3"/>
+        <g class="txt" style="font-size:10.5px">
+          <text x="272" y="252">To: A.Chonnigarn@mitsui.com</text>
+          <text x="272" y="268">Khun Boom — following the WASDE print, we see HRW</text>
+          <text x="272" y="282">fundamentals softer than the trade expected. Could you</text>
+          <text x="272" y="296">re-indicate HRW 11.5% for 20 Dec – 20 Jan, CFR Koh</text>
+          <text x="272" y="310">Sichang, 55KMT?</text>
+        </g>
+        <rect class="p" x="260" y="336" width="78" height="0.1"/>
+        <text class="note" x="692" y="252">Send · Edit · Discard</text>
+        <text class="dim" x="692" y="270">He sends it. The agent never does.</text>
+
+        <!-- expectation provenance -->
+        <text class="lbl" x="692" y="300">Expectation set from</text>
+        <text class="dim" x="692" y="316">Reuters trade poll, prior WASDE,</text>
+        <text class="dim" x="692" y="330">and his own stated bias — shown,</text>
+        <text class="dim" x="692" y="344">so a wrong call is auditable.</text>
+      </svg>
+    </div>
+    <figcaption>Three rules this wireframe encodes. <b>Silence is the default</b> — it fires only
+      when the surprise clears a per-class threshold he sets, or it becomes an alarm he learns to
+      ignore. <b>The consequence is in money</b>, against his actual open position, not in bushels.
+      <b>The message is drafted, never sent</b> — the agent prepares the five minutes, he spends
+      them.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="sec-head prose">
+    <p class="eyebrow">Surface 2 — the daily surface</p>
+    <h2>Quote Board and the decomposition</h2>
+  </div>
+  <div class="prose">
+    <p>Ten or more indications a day arrive as flat numbers in prose. The board's job is to make
+      them comparable, and the decomposition's job is to show what is actually inside the number —
+      including the part the supplier did not itemise.</p>
+  </div>
+
+  <figure>
+    <div class="wf">
+      <svg viewBox="0 0 980 440" role="img" aria-label="Quote board wireframe with a sortable list of supplier indications and a stacked bar decomposition of a flat price into futures, basis, freight and residual margin">
+        <!-- toolbar -->
+        <rect class="pf" x="8" y="12" width="964" height="38"/>
+        <text class="lbl" x="24" y="36">Class</text><rect class="p" x="62" y="22" width="86" height="20" rx="3"/>
+        <text class="txt" x="70" y="36" style="font-size:10px">HRW 11.5%</text>
+        <text class="lbl" x="166" y="36">Shipment</text><rect class="p" x="226" y="22" width="110" height="20" rx="3"/>
+        <text class="txt" x="234" y="36" style="font-size:10px">20 Dec – 20 Jan</text>
+        <text class="lbl" x="352" y="36">Discharge</text><rect class="p" x="414" y="22" width="92" height="20" rx="3"/>
+        <text class="txt" x="422" y="36" style="font-size:10px">Koh Sichang</text>
+        <text class="note" x="800" y="36">Laid-in basis · not headline flat</text>
+
+        <!-- table head -->
+        <text class="lbl" x="24" y="76">Supplier</text>
+        <text class="lbl" x="150" y="76">Received</text>
+        <text class="lbl" x="250" y="76">Qty</text>
+        <text class="lbl" x="310" y="76">Flat $/t</text>
+        <text class="lbl" x="392" y="76">vs fair value</text>
+        <text class="lbl" x="506" y="76">Per cargo</text>
+        <text class="lbl" x="614" y="76">Composition</text>
+        <text class="lbl" x="896" y="76">State</text>
+        <line class="hair" x1="16" y1="84" x2="964" y2="84"/>
+
+        <!-- rows -->
+        <g class="txt">
+          <text x="24" y="110">Mitsui</text>
+          <text x="24" y="146">Cargill</text>
+          <text x="24" y="182">CHS</text>
+          <text x="24" y="218">Bunge</text>
+        </g>
+        <g class="dim">
+          <text x="150" y="110">today 09:23</text>
+          <text x="150" y="146">today 11:12</text>
+          <text x="150" y="182">yesterday</text>
+          <text x="150" y="218">3 days ago</text>
+        </g>
+        <g class="mono" style="font-size:11px" fill="var(--ink-2)" font-family="IBM Plex Mono">
+          <text x="250" y="110">55,000</text><text x="310" y="110">366.80</text>
+          <text x="250" y="146">60,000</text><text x="310" y="146">368.40</text>
+          <text x="250" y="182">52,500</text><text x="310" y="182">365.90</text>
+          <text x="250" y="218">57,000</text><text x="310" y="218">371.00</text>
+        </g>
+        <g class="mono" style="font-size:11px" font-family="IBM Plex Mono">
+          <text class="badv" x="392" y="110">+4.20</text>
+          <text class="badv" x="392" y="146">+5.80</text>
+          <text class="goodv" x="392" y="182">−0.40</text>
+          <text class="badv" x="392" y="218">+8.10</text>
+          <text class="badv" x="506" y="110">+$231k</text>
+          <text class="badv" x="506" y="146">+$348k</text>
+          <text class="goodv" x="506" y="182">−$21k</text>
+          <text class="badv" x="506" y="218">+$462k</text>
+        </g>
+
+        <!-- composition bars -->
+        <g>
+          <rect x="614" y="99" width="128" height="14" fill="var(--c-futures)"/>
+          <rect x="744" y="99" width="62" height="14" fill="var(--c-basis)"/>
+          <rect x="808" y="99" width="40" height="14" fill="var(--c-freight)"/>
+          <rect x="850" y="99" width="22" height="14" fill="var(--c-unknown)"/>
+
+          <rect x="614" y="135" width="128" height="14" fill="var(--c-futures)"/>
+          <rect x="744" y="135" width="58" height="14" fill="var(--c-basis)"/>
+          <rect x="804" y="135" width="44" height="14" fill="var(--c-freight)"/>
+          <rect x="850" y="135" width="26" height="14" fill="var(--c-unknown)"/>
+
+          <rect x="614" y="171" width="128" height="14" fill="var(--c-futures)"/>
+          <rect x="744" y="171" width="64" height="14" fill="var(--c-basis)"/>
+          <rect x="810" y="171" width="38" height="14" fill="var(--c-freight)"/>
+          <rect x="850" y="171" width="10" height="14" fill="var(--c-margin)"/>
+
+          <rect x="614" y="207" width="128" height="14" fill="var(--c-futures)"/>
+          <rect x="744" y="207" width="60" height="14" fill="var(--c-basis)"/>
+          <rect x="806" y="207" width="42" height="14" fill="var(--c-freight)"/>
+          <rect x="850" y="207" width="34" height="14" fill="var(--c-unknown)"/>
+        </g>
+        <g class="note" style="font-size:8.5px">
+          <text x="896" y="110">corrected ×1</text>
+          <text x="896" y="146">fresh</text>
+          <text x="896" y="182">stale 26h</text>
+          <text x="896" y="218">expired</text>
+        </g>
+
+        <line class="hair" x1="16" y1="238" x2="964" y2="238"/>
+
+        <!-- detail -->
+        <text class="lbl" x="24" y="266">Mitsui · HRW 11.5% · 20 Dec – 20 Jan · CFR Koh Sichang · 55KMT / 10%</text>
+
+        <rect class="p" x="24" y="280" width="520" height="130"/>
+        <text class="lbl" x="38" y="300">What you are paying for</text>
+        <g>
+          <rect x="38" y="310" width="236" height="26" fill="var(--c-futures)"/>
+          <rect x="276" y="310" width="112" height="26" fill="var(--c-basis)"/>
+          <rect x="390" y="310" width="76" height="26" fill="var(--c-freight)"/>
+          <rect x="468" y="310" width="42" height="26" fill="var(--c-unknown)"/>
+        </g>
+        <g class="mono" style="font-size:9.5px" fill="var(--surface)" font-family="IBM Plex Mono">
+          <text x="46" y="327">230.30</text>
+          <text x="284" y="327">93.70</text>
+          <text x="398" y="327">38.60</text>
+        </g>
+        <g class="lbl">
+          <text x="38" y="352">KWZ26 settle</text>
+          <text x="276" y="352">basis</text>
+          <text x="390" y="352">freight</text>
+          <text x="468" y="352">residual</text>
+        </g>
+        <text class="note" x="38" y="376">Residual $4.20/t = $231,000 across the cargo.</text>
+        <text class="dim" x="38" y="392">Mitsui itemised nothing. Futures and basis are reconstructed from</text>
+        <text class="dim" x="38" y="404">settlement; freight from the Supramax market. The gap is the conversation.</text>
+
+        <rect class="p" x="560" y="280" width="412" height="130"/>
+        <text class="lbl" x="574" y="300">The Buyer · drafted counter</text>
+        <g class="txt" style="font-size:10.5px">
+          <text x="574" y="320">Counter at $363.40 — $3.40/t below indication.</text>
+          <text x="574" y="338">Grounds: CHS at 365.90 for the same laycan; your own</text>
+          <text x="574" y="352">basis 2 cents under the Sep average; freight soft on</text>
+          <text x="574" y="366">a Supramax open Singapore.</text>
+        </g>
+        <text class="note" x="574" y="390">Mitsui conceded 2 of the last 3 counters · avg $2.80/t</text>
+        <text class="dim" x="574" y="404">If accepted: $187,000 saved, logged to the savings ledger.</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--c-futures)"></i>Futures</span>
+      <span><i style="background:var(--c-basis)"></i>Basis</span>
+      <span><i style="background:var(--c-freight)"></i>Freight &amp; insurance</span>
+      <span><i style="background:var(--c-margin)"></i>Margin, itemised</span>
+      <span><i style="background:var(--c-unknown)"></i>Residual — not itemised</span>
+    </div>
+    <figcaption>The grey block is the point. Because suppliers quote flat and leave
+      <span class="mono">cnf_basis</span> and <span class="mono">cnf_futures</span> empty, the
+      honest display is a <b>reconstruction with its unexplained remainder shown as unexplained</b>
+      — not a confident four-way split we cannot actually source. That remainder, priced per cargo,
+      is the opening line of the negotiation.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="sec-head prose">
+    <p class="eyebrow">Surface 3 — the position</p>
+    <h2>Position Book</h2>
+  </div>
+  <div class="prose">
+    <p>This one we do not get to invent: his workbook already defines it. The design job is to keep
+      his model intact — the flat/basis split, the legs, the thresholds — and add only what Excel
+      cannot do, which is tell him when something has moved.</p>
+  </div>
+
+  <figure>
+    <div class="wf">
+      <svg viewBox="0 0 980 364" role="img" aria-label="Position book wireframe showing a cargo header, flat and basis split, contract legs with filled and open status, mark to market and target thresholds">
+        <rect class="pf" x="8" y="12" width="964" height="340"/>
+        <line class="hair" x1="8" y1="58" x2="972" y2="58"/>
+        <text class="big" x="24" y="42" style="font-size:16px">Pacific Wind · PNW · Mitsui</text>
+        <text class="dim" x="280" y="42">Aug 15 – Sep 15 2026 · arrive 7 Oct, Koh Si Chang · contracted 04-Jun-26</text>
+        <text class="note" x="860" y="42">NS 14.5% (65 DHV)</text>
+
+        <!-- split -->
+        <text class="lbl" x="24" y="84">Cargo split</text>
+        <rect x="24" y="92" width="238" height="20" fill="var(--c-futures)"/>
+        <rect x="262" y="92" width="102" height="20" fill="var(--c-basis)"/>
+        <text class="mono" x="34" y="106" style="font-size:10px" fill="var(--surface)" font-family="IBM Plex Mono">FLAT 70% · 9,100 t · 67 lots</text>
+        <text class="mono" x="272" y="106" style="font-size:10px" fill="var(--surface)" font-family="IBM Plex Mono">BASIS 30% · 3,900 t</text>
+        <text class="dim" x="376" y="106">13,000 t of a 55,000 t vessel · remaining contracts 0</text>
+
+        <!-- legs table -->
+        <text class="lbl" x="24" y="140">Date</text>
+        <text class="lbl" x="104" y="140">Lots</text>
+        <text class="lbl" x="158" y="140">Status</text>
+        <text class="lbl" x="236" y="140">¢/bu</text>
+        <text class="lbl" x="310" y="140">$/t</text>
+        <text class="lbl" x="378" y="140">Basis</text>
+        <text class="lbl" x="444" y="140">Flat</text>
+        <text class="lbl" x="528" y="140">Gain / loss</text>
+        <line class="hair" x1="24" y1="148" x2="640" y2="148"/>
+
+        <g class="mono" style="font-size:11px" fill="var(--ink-2)" font-family="IBM Plex Mono">
+          <text x="24" y="170">04-Jun-26</text><text x="104" y="170">67</text><text x="236" y="170">646.80</text><text x="310" y="170">237.66</text><text x="378" y="170">98.84</text><text x="444" y="170">336.50</text><text x="528" y="170">—</text>
+          <text x="24" y="192">23-Jun-26</text><text x="104" y="192">5</text><text x="236" y="192">630.00</text><text x="310" y="192">231.49</text><text x="378" y="192">98.84</text><text x="444" y="192">330.33</text>
+          <text x="24" y="214">26-Jun-26</text><text x="104" y="214">5</text><text x="236" y="214">600.00</text><text x="310" y="214">220.46</text><text x="378" y="214">98.84</text><text x="444" y="214">319.30</text>
+          <text x="24" y="236">26-Jun-26</text><text x="104" y="236">5</text><text x="236" y="236">595.00</text><text x="310" y="236">218.63</text><text x="378" y="236">98.84</text><text x="444" y="236">317.47</text>
+          <text x="24" y="258">15-Aug-26</text><text x="104" y="258">9</text><text x="236" y="258">685.00</text><text x="310" y="258">251.69</text><text x="378" y="258">98.84</text><text x="444" y="258">350.53</text>
+        </g>
+        <g class="mono" style="font-size:11px" font-family="IBM Plex Mono">
+          <text class="goodv" x="528" y="192">+4,497</text>
+          <text class="goodv" x="528" y="214">+11,993</text>
+          <text class="badv" x="528" y="258">−16,641</text>
+        </g>
+        <!-- status chips -->
+        <g>
+          <rect x="158" y="160" width="46" height="14" rx="2" fill="var(--rule)"/>
+          <rect x="158" y="182" width="46" height="14" rx="2" fill="var(--rule)"/>
+          <rect x="158" y="204" width="46" height="14" rx="2" fill="var(--rule)"/>
+          <rect x="158" y="226" width="46" height="14" rx="2" fill="var(--accent)" opacity=".3"/>
+          <rect x="158" y="248" width="46" height="14" rx="2" fill="var(--rule)"/>
+        </g>
+        <g class="txt" style="font-size:9px">
+          <text x="165" y="171">Filled</text><text x="165" y="193">Filled</text><text x="165" y="215">Filled</text>
+          <text class="acc" x="165" y="237">Open</text><text x="165" y="259">Filled</text>
+        </g>
+        <text class="note" x="212" y="237">resting at 595 — 3.5¢ away</text>
+
+        <line class="hair" x1="24" y1="276" x2="640" y2="276"/>
+        <text class="lbl" x="24" y="298">Mark to market, previous close</text>
+        <text class="mono" x="236" y="298" style="font-size:11px" font-family="IBM Plex Mono" fill="var(--ink-2)">718.50</text>
+        <text class="lbl" x="310" y="298">breakeven</text>
+        <text class="mono goodv" x="528" y="298" style="font-size:11px" font-family="IBM Plex Mono">+15,092</text>
+
+        <!-- KPI rail -->
+        <rect class="p" x="664" y="78" width="292" height="256"/>
+        <text class="lbl" x="680" y="100">Position total</text>
+        <text class="huge badv" x="680" y="134">−$378,749</text>
+        <text class="dim" x="680" y="152">−฿12.5M at 33.0</text>
+
+        <line class="hair" x1="680" y1="168" x2="940" y2="168"/>
+        <text class="lbl" x="680" y="190">Take profit</text>
+        <text class="mono goodv" x="880" y="190" style="font-size:12px" font-family="IBM Plex Mono">+50,000</text>
+        <text class="lbl" x="680" y="212">Loss cut</text>
+        <text class="mono badv" x="880" y="212" style="font-size:12px" font-family="IBM Plex Mono">−25,000</text>
+
+        <!-- threshold bar -->
+        <rect x="680" y="226" width="260" height="8" fill="var(--rule)"/>
+        <rect x="680" y="226" width="30" height="8" fill="var(--bad)"/>
+        <rect x="880" y="226" width="60" height="8" fill="var(--good)"/>
+        <circle cx="696" cy="230" r="5" fill="var(--bad)"/>
+        <text class="note" x="680" y="252">Breached the loss cut 11 days ago.</text>
+        <text class="dim" x="680" y="268">Excel cannot tell him this. The desk can —</text>
+        <text class="dim" x="680" y="282">and must say who was told, and when.</text>
+
+        <line class="hair" x1="680" y1="298" x2="940" y2="298"/>
+        <text class="lbl" x="680" y="318">Coverage, Q1'27 flour demand</text>
+        <rect x="680" y="326" width="260" height="8" fill="var(--rule)"/>
+        <rect x="680" y="326" width="174" height="8" fill="var(--c-futures)"/>
+        <text class="note" x="860" y="334">67%</text>
+      </svg>
+    </div>
+    <figcaption>Everything left of the rail is his spreadsheet, reproduced deliberately — the
+      vocabulary is already his, so we should not rename it. Everything on the rail is what a
+      system adds: <b>a threshold that was breached eleven days ago and nobody was told.</b>
+      Coverage against forward flour demand is the one genuinely new column, and it is what turns a
+      trading ledger into a procurement one.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="sec-head prose">
+    <p class="eyebrow">Surfaces 4–8, in brief</p>
+    <h2>The rest of the desk</h2>
+  </div>
+  <div class="cols2">
+    <div>
+      <h4>Morning Brief — the landing surface</h4>
+      <p>One screen at 07:00 ICT: what moved overnight, which drivers changed stance, what is
+        awaiting his approval, and the one decision today actually requires. Built on his own
+        causal taxonomy — weather, crop condition, production, supply, seasonal, export, demand,
+        Commitment of Traders, government policy, forex — with a bearish/bullish split he already
+        reads daily from his brokers, and a $/t sensitivity on each lever.</p>
+
+      <h4>Cargo Pipeline</h4>
+      <p>Vessels on the water, each with laycan, discharge port, the co-load partners sharing the
+        hull, and a document completeness meter driven by The Clerk's page classification.
+        Per-hold weights reconciled against the bill of lading; quality certificates against the
+        GAFTA spec. Despatch and demurrage exposure sits here too — it appears in his OneNote and
+        in nobody's dashboard.</p>
+    </div>
+    <div>
+      <h4>Benchmark &amp; Savings Ledger</h4>
+      <p>Two things on one page because they answer the same question: did we buy well? The
+        benchmark estimates peer laid-in cost with an honest confidence band. The ledger attributes
+        every $/t saved to the action that produced it — a counter accepted, a basis locked on a
+        dip, a freight line challenged. That ledger is what justifies the subscription at renewal.</p>
+
+      <h4>Blend &amp; margin bridge · Ask the Desk</h4>
+      <p>The bridge carries the purchase through to ฿/kg per flour grade and the margin on each
+        customer's quarterly offer, closing the loop to the workbook at <span class="mono">17:52</span>.
+        Ask the Desk is plain retrieval over everything the desk has ever held — the answer to a head
+        of procurement who keeps it in his head.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head prose">
+    <p class="eyebrow">Can we actually get the data</p>
+    <h2>Feasibility, stated honestly</h2>
+  </div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>What we need</th><th>Source</th><th>Reality</th></tr></thead>
+      <tbody>
+        <tr><td>Supplier indications</td><td>His <span class="mono">Price Indications</span> Outlook folder, 125 items, already populated</td><td class="said">Easy. The folder and the routing rule exist. Needs a mailbox decision, not engineering.</td></tr>
+        <tr><td>KC HRW &amp; Chicago SRW futures</td><td>CME settlements; delayed free, real-time paid</td><td class="said">Easy — but note what he uses today: <span class="mono">"Barchart, it's good enough for me, it's free… it's delayed by 15 minutes, which sucks."</span> <span class="mono">[61:50]</span> Delayed is fine everywhere except Night Watch, where 15 minutes is longer than the entire window of advantage. Real-time at the release moment is precisely the edge he does not currently have.</td></tr>
+        <tr><td>MGEX spring wheat <span class="mono">MWU26</span></td><td>MIAX/MGEX</td><td class="said">Awkward and load-bearing. His biggest class prices off it and there is no free feed. Budget for it.</td></tr>
+        <tr><td>WASDE, at the second</td><td>USDA ESMIS / NASS</td><td class="said">Feasible. Published to a schedule from a lockup. The engineering is in the pre-release expectation sheet, not the fetch.</td></tr>
+        <tr><td>Export sales, COT, crop progress</td><td>USDA FAS, CFTC</td><td class="said">Easy, free, weekly.</td></tr>
+        <tr><td>Freight</td><td>Baltic indices he already reads; Supramax/Panamax time-charter rates, bunkers</td><td class="said">Medium. He was trained by Mitsui to build this from vessel day rates, so the model is known — the rate data is the licence cost.</td></tr>
+        <tr><td>FX — USD/THB, AUD, CAD</td><td>Any feed</td><td class="said">Trivial.</td></tr>
+        <tr><td>Peer cost basis</td><td>Thai customs declarations, vessel line-ups, co-load cargoes</td><td class="said"><b>The hard one.</b> Partly inferable, partly not. UFM sits inside 7-mill cargoes, which is real signal — but this may be a data-sharing arrangement between mills rather than a feed, i.e. a business problem wearing an engineering costume. Scheduled last for that reason.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head prose">
+    <p class="eyebrow">Sequence</p>
+    <h2>What to build, in what order</h2>
+    <p class="prose" style="color:var(--ink-2)">The order is a real dependency chain, so the
+      numbering here means something: each stage needs the one before it.</p>
+  </div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th style="width:5%">#</th><th style="width:26%">Stage</th><th>What it proves, and what it needs first</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">1</td><td><b>The Watch</b> — release mode<br><span class="dimrow">"Night Watch"</span></td><td>Wins the demo and the relationship. Standalone — needs only the futures feed and the expectation sheet, no mailbox access, no integration. It is the cheapest thing on this page that he would feel the next time a WASDE lands.</td></tr>
+        <tr><td class="mono">2</td><td><b>The Buyer</b> — intake<br><span class="dimrow">the Quote Board</span></td><td>Replaces the flow he built himself, and fixes its silent data loss. Needs the mailbox decision. Produces the quote history everything downstream depends on.</td></tr>
+        <tr><td class="mono">3</td><td><b>The Buyer</b> — fair value and counter</td><td>The revenue story — it competes with ~$275k/yr in consultancy success fees. Cannot exist before stage 2, because the counter-offer argument is built from quote history.</td></tr>
+        <tr><td class="mono">4</td><td><b>The Watch</b> — position book</td><td>Lifts his workbook into shared state and ends the key-person risk. Independent of 2 and 3; can run in parallel if there is capacity.</td></tr>
+        <tr><td class="mono">5</td><td><b>The Clerk</b> — document pack</td><td>Page splitting and spec reconciliation. Lower urgency, high goodwill — it removes work he openly dislikes.</td></tr>
+        <tr><td class="mono">6</td><td><b>The Buyer</b> — benchmark<br><b>The Clerk</b> — blend bridge</td><td>Both need accumulated history to be worth anything, and the benchmark needs a data arrangement we do not yet have. Last for good reasons, not as a deprioritisation.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout prose">
+    <p class="eyebrow">The risk Pavin raised himself</p>
+    <blockquote style="margin-top:0">There might have to be a lot of room for tailoring it to what a
+      company needs — like how Salesforce or SAP would tailor the ERP system to a company based on
+      its needs. They might have their own way of doing things… getting them to adopt the app you
+      guys would make, it has to be very easy, and in their own way that they're comfortable with.
+      <cite>Pavin, 64:10</cite></blockquote>
+    <p>Our mitigation is that everything specific to a desk — origins, classes, suppliers,
+      instruments, discharge ports, currency, contract standard — lives in a desk profile, not in
+      code. The test of whether that worked is not UFM. It is the second mill, and whether it costs
+      a configuration file or a rewrite.</p>
+    <p>Note the second half of his warning, which is about adoption rather than architecture: the
+      product has to work <em>the way he already works</em>. That is the reason the Position Book
+      reproduces his column names instead of improving them.</p>
+  </div>
+
+  <div class="callout prose">
+    <p class="eyebrow">Where we disagree with him, and why it is worth raising</p>
+    <p>Asked what to build first, Pavin said: <span class="said">"the first thing that's easiest to
+      make is the fragmented part, putting things together. The research thing is interesting and
+      that'll be harder."</span> <span class="mono">[65:30]</span></p>
+    <p>He is right about difficulty and we are sequencing against him anyway — Night Watch first,
+      consolidation second. The reason is that consolidation is the thing he has <em>already built
+      for himself</em>, so rebuilding it proves we can match his spreadsheet; it does not prove we
+      can do something he cannot. Night Watch does, it is standalone, and it lands on a night he is
+      already awake. <strong>This is a disagreement to put to him directly</strong> rather than
+      resolve in a document — he is the one who offered to be a design partner.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head prose">
+    <p class="eyebrow">Before building</p>
+    <h2>What we still need to ask him</h2>
+  </div>
+  <div class="prose">
+    <ol>
+      <li>The <span class="mono">Competitor Prices</span> tab exists — what is in it, and where do
+        those numbers come from? This decides whether N7 is tractable.</li>
+      <li>Is the 70/30 flat/basis split policy, per-cargo negotiation, or his own judgement? It
+        changes whether the Position Book proposes splits or just records them.</li>
+      <li>Who else touches <span class="mono">PROCUREMENT TRACKER</span> — is it private to him, or
+        shared with Khun Pracha? That determines whether we are replacing a personal tool or a team
+        one, which is a different product.</li>
+      <li>What does AVS actually deliver weekly, and what does the $1,500 buy that his daily broker
+        decks and the US Wheat letters do not?</li>
+      <li>Does the Power Automate flow write only to <span class="mono">wheat_price_template</span>,
+        or also into the tracker's <span class="mono">Price Indications</span> tab?</li>
+      <li>Who owns the mailbox decision — and would he pay for the desk, or only for the brokering
+        that comes after it? He deflected this once already.</li>
+    </ol>
+    <p>Two of these are easy to ask, because he volunteered the channel himself:
+      <span class="said">"You can be a design partner if you'd like… if you have any questions, just
+      schedule a meeting with me."</span> <span class="mono">[66:00]</span></p>
+    <p>He also gave us one piece of homework, and it should be done before any of the above:
+      <span class="said">"Check first to see if there's any tools out there. I doubt it. And maybe
+      that's also — maybe it's because it's too complicated, and that's why there's no tools."</span>
+      <span class="mono">[63:40]</span> That second sentence is the real question. If no one has
+      built this, the interesting possibility is not that nobody noticed; it is that the per-customer
+      tailoring makes it uneconomic. We should find out which before committing.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p style="margin:0">Design proposal for discussion. Every quotation and figure is drawn from the
+      4 October 2026 walkthrough recording and cited by timestamp; screen contents were read from
+      extracted keyframes. Nothing here has been built.</p>
+  </div>
+</footer>

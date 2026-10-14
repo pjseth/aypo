@@ -1,0 +1,15 @@
+evidence/audio.wav
+evidence/frames/
+evidence/*.mp4
+__pycache__/
+*.pyc
+data/
+docs/_print.html
+docs/_shot.png
+docs/_test.pdf
+docs/_full.png
+docs/_crop.png
+app/_shots/
+app/_probe_*.html
+app/_shell*.png
+_jscheck.html
