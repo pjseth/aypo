@@ -66,6 +66,13 @@
   function outstandingOf(c) { return Math.max(0, c.docs_total - c.docs_received); }
   function plural(n, one, many) { return fmt.n(n) + " " + (n === 1 ? one : many); }
 
+  /* One cargo in the set has a real merged pack behind it; every provenance
+     note points at it, so the vessel and the page count are read off the data
+     rather than written into the sentence. */
+  function realPack() {
+    return D.cargoes.filter(function (c) { return c.pack; })[0] || null;
+  }
+
   /* ETA in plain words, measured from the dataset's own build date. */
   function etaPhrase(eta) {
     var d = fmt.daysBetween(D.built, eta);
@@ -229,7 +236,7 @@
 
       el("div", { style: { display: "grid", gap: "9px" } }, [
         el("div", { class: "flex items-center between", style: { gap: "8px" } }, [
-          labelled("UFM share of cargo"),
+          labelled(mismatch ? "UFM share of the declared pool" : "UFM share of cargo"),
           share < 0.5 && pool.parts.length > 1
             ? GD.chip("Minority of a " + fmt.n(pool.parts.length) + "-mill co-load", "outline", "users")
             : null
@@ -369,9 +376,11 @@
       return c.vessel + " " + fmt.n(c.docs_received) + "/" + fmt.n(c.docs_total);
     }).join(" · ");
 
+    var real = realPack();
+
     return GD.card({
       title: "Document pack matrix",
-      sub: "Ten document types per vessel · " + perVessel,
+      sub: plural(D.doc_types.length, "document type", "document types") + " per vessel · " + perVessel,
       actions: [
         overdue > 0 ? GD.chip(fmt.n(overdue) + " overdue", "warn", "alert") : null,
         GD.chip(fmt.n(out) + " outstanding", out > 0 ? "outline" : "good", out > 0 ? "clock" : "check")
@@ -384,13 +393,15 @@
           el("span", { text: "Certificates of weight and quality are issued per hold, so one line here can stand for several certificate numbers." })
         ]),
         el("span", { style: { flex: "1" } }),
-        GD.tipOn(
+        real ? GD.tipOn(
           el("span", { class: "flex items-center", style: { gap: "6px", color: "var(--ink-4)" } }, [
             icon("alert", 13, 1.6),
-            el("span", { text: "Only the Pacific Wind pack is a real document set" })
+            el("span", { text: "Only the " + real.vessel + " pack is a real document set" })
           ]),
-          "Document dates on the other two cargoes are generated, not supplied — the Pacific Wind pack, its 45 pages and its certificate numbers are the real ones."
-        )
+          "Document dates on the other cargoes are generated, not supplied — the " +
+          GD.esc(real.vessel) + " pack, its " + GD.esc(fmt.n(real.pages)) +
+          " pages and its certificate numbers are the real ones."
+        ) : null
       ]
     });
   }
@@ -652,6 +663,7 @@
     var claims = claimsOf(c);
     var ufmPool = ufmPoolMt(c);
     var total = poolTotal(c);
+    var real = realPack();
 
     GD.sheet({
       title: c.vessel,
@@ -700,9 +712,9 @@
           holdsPanel(c),
           variancePanel(c),
 
-          !c.pack ? el("p", { class: "card-sub" },
-            "Document dates on this cargo are generated. Only the Pacific Wind pack — its " +
-            "45 pages and its certificate numbers — is a real document set.") : null
+          !c.pack && real ? el("p", { class: "card-sub" },
+            "Document dates on this cargo are generated. Only the " + real.vessel + " pack — its " +
+            fmt.n(real.pages) + " pages and its certificate numbers — is a real document set.") : null
         ])];
       },
       foot: function (close) {
@@ -829,7 +841,13 @@
           value: fmt.n(cargoes.length),
           unit: cargoes.length === 1 ? "vessel" : "vessels",
           icon: "ship",
-          delta: [GD.dot("good"), el("span", { class: "flex items-center", style: { gap: "4px" } }, mixNodes)]
+          /* No dot: this row is a breakdown, not a state, and a green dot would
+             read as one. It wraps rather than overflowing the tile — .stat
+             clips its overflow, so an unwrapped flex row loses its last word. */
+          delta: [el("span", {
+            class: "flex items-center",
+            style: { gap: "4px", "flex-wrap": "wrap", "row-gap": "2px" }
+          }, mixNodes)]
         }),
         GD.stat({
           label: "UFM tonnes committed",

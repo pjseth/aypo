@@ -49,6 +49,16 @@
   function plural(n, one, many) {
     return fmt.n(n, 0) + " " + (n === 1 ? one : many);
   }
+  /* How long the position has been through the loss cut, or null when the workbook
+     carries the breach without a date. Everything that prints the age goes through
+     here, so a missing date drops the clause instead of printing "— days". */
+  function breachDays(P) {
+    return P.breached_on ? fmt.daysBetween(P.breached_on, D.built) : null;
+  }
+  function breachAge(P) {
+    var d = breachDays(P);
+    return d === null ? null : plural(d, "day", "days");
+  }
   /* P&L: a positive number is the good outcome, so toneFor is inverted. */
   function pnlTone(v) { return GD.toneFor(v, true); }
 
@@ -192,9 +202,10 @@
                 strong(cents(leg.cents)),
                 el("span", { text: ". " + live.key + " last printed " }),
                 strong(cents(live.last)),
+                el("span", { text: ", " }),
+                el("span", { class: "num", text: fmt.n(Math.abs(distance), 2) + " ¢/bu" }),
                 el("span", {
-                  text: ", " + fmt.n(Math.abs(distance), 2) + " ¢/bu " +
-                    (distance > 0 ? "above" : distance < 0 ? "below" : "level with") + " the order."
+                  text: " " + (distance > 0 ? "above" : distance < 0 ? "below" : "level with") + " the order."
                 })
               ])
             ], { "margin-top": "7px" })
@@ -208,7 +219,7 @@
             onclick: close
           }, [icon("check", 14, 2), "Close"]),
           el("span", { style: { flex: "1" } }),
-          el("span", { class: "card-sub", text: "Read off the PROCUREMENT TRACKER workbook, 4 Oct 2026" })
+          el("span", { class: "card-sub", text: "Read off the PROCUREMENT TRACKER workbook" })
         ];
       }
     });
@@ -220,14 +231,17 @@
      The agent writes the note; Pavin sends it. */
   function escalate() {
     var P = D.position;
-    var days = fmt.daysBetween(P.breached_on, D.built);
+    var age = breachAge(P);
     var mw = P.blocks[0], kw = P.blocks[1];
     var open = allLegs().filter(function (x) { return x.leg.status === "Open"; });
 
     var draft =
       "Khun Pracha — the US Aug–Sep '26 futures position is marked at " + sgnUsd(P.total_usd) +
-      " against the " + sgnUsd(P.loss_cut_usd) + " loss cut. It went through the cut on " +
-      fmt.date(P.breached_on) + " and has been through it for " + plural(days, "day", "days") + ". " +
+      " against the " + sgnUsd(P.loss_cut_usd) + " loss cut. " +
+      (P.breached_on
+        ? "It went through the cut on " + fmt.date(P.breached_on) +
+          (age ? " and has been through it for " + age : "") + ". "
+        : "") +
       (mw ? fmt.n(mw.filled_lots, 0) + " lots filled on " + mw.instrument : "") +
       (kw ? " and " + fmt.n(kw.filled_lots, 0) + " on " + kw.instrument : "") + ". " +
       (open.length
@@ -239,7 +253,8 @@
     GD.sheet({
       title: P.breach ? "Loss cut breached" : "Position note",
       sub: P.breach
-        ? "Through " + sgnUsd(P.loss_cut_usd) + " on " + fmt.date(P.breached_on) + " · " + plural(days, "day", "days") + " ago"
+        ? "Through " + sgnUsd(P.loss_cut_usd) + " on " + fmt.date(P.breached_on) +
+          (age ? " · " + age + " ago" : "")
         : "Inside both thresholds",
       body: function () {
         return [
@@ -250,7 +265,11 @@
             ["Loss cut", el("span", { class: "val-up", text: sgnUsd(P.loss_cut_usd) })],
             ["Take profit", el("span", { class: "val-down", text: sgnUsd(P.take_profit_usd) })],
             ["Headroom to take profit", fmt.usd0(P.headroom_to_tp)],
-            ["Breached on", P.breached_on ? fmt.date(P.breached_on) + " · " + fmt.ago(P.breached_on) : "—"],
+            /* The day count, not fmt.ago: ago() rounds 11 days to "last week", which
+               would contradict the "11 days" this same sheet states in its subtitle. */
+            ["Breached on", P.breached_on
+              ? fmt.date(P.breached_on) + (age ? " · " + age + " ago" : "")
+              : "—"],
             ["Cargo", P.cargo + " · " + P.counterparty]
           ]),
           hairline(),
@@ -307,7 +326,8 @@
 
     GD.sheet({
       title: "Legs as tab-separated text",
-      sub: count + " legs across " + D.position.blocks.length + " blocks · paste straight back into Excel",
+      sub: plural(count, "leg", "legs") + " across " +
+        plural(D.position.blocks.length, "block", "blocks") + " · paste straight back into Excel",
       body: function () {
         var ta = el("textarea", {
           readonly: true, "aria-label": "Futures legs as tab-separated values",
@@ -361,9 +381,9 @@
 
      One horizontal scale carrying four real numbers: the loss cut, breakeven, the take
      profit, and where the position actually is. The scale is built from plain divs and
-     inline styles — no new CSS — and both ends are labelled, so it reads with the colour
-     switched off. The breached stretch is also striped, so the bad region is not carried
-     by hue alone. */
+     inline styles — no new CSS. Every level is named with its number in the key beneath,
+     and the breached stretch is striped as well as coral, so the card reads with the
+     colour switched off. */
 
   function thresholdBar() {
     var P = D.position;
@@ -379,18 +399,26 @@
     var xPos = x(pos), xLc = x(lc), xZero = x(0), xTp = x(tp);
     var markerColor = pos < 0 ? "var(--up)" : pos > 0 ? "var(--accent)" : "var(--ink-3)";
 
-    /* ---- callout row: the stem and the "now" pill, edge-aware so it cannot clip */
-    var pillStyle = { position: "absolute", bottom: "0", "white-space": "nowrap" };
-    if (xPos < 15) { pillStyle.left = xPos.toFixed(2) + "%"; pillStyle["margin-left"] = "-11px"; }
-    else if (xPos > 85) { pillStyle.right = (100 - xPos).toFixed(2) + "%"; pillStyle["margin-right"] = "-11px"; }
+    /* ---- callout row: a pill naming the position and a stem down onto the marker.
+       The pill sits at the top of the row and the stem runs out of its underside to
+       the marker — the stem is drawn first so the pill covers the part behind it.
+       Within 14% of either end the pill is anchored to that end rather than centred
+       on the marker, which is what keeps it from clipping out of the card. */
+    var pillStyle = { position: "absolute", top: "0", "white-space": "nowrap" };
+    if (xPos < 14) pillStyle.left = "0";
+    else if (xPos > 86) pillStyle.right = "0";
     else { pillStyle.left = xPos.toFixed(2) + "%"; pillStyle.transform = "translateX(-50%)"; }
 
-    var callout = el("div", { style: { position: "relative", height: "30px" } }, [
+    var callout = el("div", { style: { position: "relative", height: "32px" } }, [
       el("div", {
+        /* translateX(-50%) so the 1px stem is centred on the marker, which is also
+           centred on its own position — without it the stem sits half a pixel right
+           of the dot it is pointing at. */
         style: {
-          position: "absolute", left: xPos.toFixed(2) + "%", bottom: "0", top: "22px",
-          width: "1px", "background-color": "var(--border-2)"
-        }
+          position: "absolute", left: xPos.toFixed(2) + "%", top: "20px", bottom: "-4px",
+          width: "1px", transform: "translateX(-50%)", "background-color": "var(--border-2)"
+        },
+        "aria-hidden": "true"
       }),
       el("div", {
         style: merge({
@@ -419,15 +447,25 @@
       return node;
     }
 
+    /* A 2px rule is unhittable with a mouse, so the visible tick sits inside a
+       transparent 14px box. The three boxes are 40px apart on screen, so no two
+       hit areas overlap. */
     function tick(at, color, name, value) {
       var node = el("div", {
         style: {
-          position: "absolute", top: "0", height: "24px", width: "2px",
+          position: "absolute", top: "0", height: "24px", width: "14px",
           left: at.toFixed(3) + "%", transform: "translateX(-50%)",
-          "background-color": color, "border-radius": "1px"
+          display: "grid", "place-items": "center"
         },
         "aria-hidden": "true"
-      });
+      }, [
+        el("div", {
+          style: {
+            width: "2px", height: "24px", "border-radius": "1px",
+            "background-color": color
+          }
+        })
+      ]);
       GD.tipOn(node, "<b>" + GD.esc(name) + "</b><div class='tip-row'><span class='tip-mute'>level</span><b>" +
         GD.esc(value) + "</b></div>");
       return node;
@@ -476,28 +514,18 @@
       marker
     ]);
 
-    /* ---- both ends named, with real numbers, not scale padding */
-    var ends = el("div", {
-      style: { display: "flex", "justify-content": "space-between", gap: "16px", "margin-top": "10px" }
-    }, [
-      el("div", null, [
-        labelled("Where it is"),
-        el("div", { class: "num " + pnlTone(pos), style: { "font-weight": "600" }, text: sgnUsd(pos) })
-      ]),
-      el("div", { style: { "text-align": "right" } }, [
-        labelled("Where he takes it off"),
-        el("div", { class: "num val-down", style: { "font-weight": "600" }, text: sgnUsd(tp) })
-      ])
-    ]);
-
-    var key = el("div", { class: "legend", style: { "margin-top": "14px" } }, [
+    /* Every level on the scale, named and with its number, so the card reads with
+       the colour switched off. The scale's own ends are not labelled: they are the
+       position and the take profit plus 8% of padding, and labelling padding as a
+       level would be the one untrue thing on the card. */
+    var key = el("div", { class: "legend", style: { "margin-top": "16px", gap: "6px 18px" } }, [
       keyItem("var(--up)", "Loss cut", sgnUsd(lc)),
       keyItem("var(--ink-4)", "Breakeven", fmt.usd0(0)),
       keyItem("var(--accent)", "Take profit", sgnUsd(tp)),
       keyItem(markerColor, "Position now", sgnUsd(pos))
     ]);
 
-    return stack(0, [callout, trackRow, ends, key]);
+    return stack(0, [callout, trackRow, key]);
   }
 
   function keyItem(color, name, value) {
@@ -516,8 +544,7 @@
   /* ================================================================== blocks */
 
   function splitBar(b) {
-    /* GD.compo wants shares; it labels its own segments in dollars, which is wrong
-       here, so the tooltips and aria-labels are restated in tonnes and lots. */
+    /* GD.compo wants shares; these are shares of a block, not dollars a tonne. */
     var bar = GD.compo([
       { name: "Flat portion", value: b.flat_pct, color: "var(--c-futures)" },
       { name: "Basis portion", value: b.basis_pct, color: "var(--c-basis)" }
@@ -528,8 +555,13 @@
       { name: "Basis portion", pct: b.basis_pct, qty: b.basis_qty, lots: b.basis_contracts }
     ].filter(function (p) { return p.pct > 0; });
 
-    GD.qsa("span", bar).forEach(function (seg, i) {
+    /* compo labels and tips its own segments in dollars per tonne, which these shares
+       are not. Swapping each segment for a clone drops those listeners and that
+       aria-label with them, instead of leaving two tooltips racing on one node. */
+    GD.qsa("span", bar).forEach(function (original, i) {
       var p = parts[i];
+      var seg = original.cloneNode(true);
+      original.parentNode.replaceChild(seg, original);
       if (!p) return;
       var text = p.name + " " + fmt.pct(p.pct, 0) + ", " + tonnes(p.qty) + ", " + fmt.n(p.lots, 0) + " lots";
       seg.setAttribute("aria-label", text);
@@ -591,16 +623,21 @@
     var where = place <= 0.15 ? "at the low" : place >= 0.85 ? "at the high" : "mid-range";
 
     /* The muted bars default to --surface-3, which is all but invisible on a white
-       card. --border-2 is the same neutral family with enough contrast to read. */
+       card. --border-2 is the same neutral family with enough contrast to read.
+       The newest bar is emphasised in ink, not in a hue: emerald and coral mean
+       "good or bad for this position" everywhere else on the page, and the day's
+       own direction is the opposite sign to the position's — the sentence under
+       the spark is where that gets said, in words, with the tone on it. */
     var spark = GD.chart.barSpark(live.history, {
-      w: 240, h: 40, take: WINDOW, muted: "var(--border-2)",
-      color: live.change < 0 ? "var(--down)" : live.change > 0 ? "var(--up)" : "var(--ink-3)"
+      w: 240, h: 40, take: WINDOW, muted: "var(--border-2)", color: "var(--ink-2)"
     });
     GD.tipOn(spark, "<b>" + GD.esc(live.key) + "</b><div class='tip-row'><span class='tip-mute'>last</span><b>" +
       GD.esc(cents(live.last)) + "</b></div><div class='tip-row'><span class='tip-mute'>" + WINDOW +
       "-session high</span><b>" + GD.esc(fmt.n(ext[1], 2)) + "</b></div>" +
       "<div class='tip-row'><span class='tip-mute'>" + WINDOW + "-session low</span><b>" +
-      GD.esc(fmt.n(ext[0], 2)) + "</b></div>");
+      GD.esc(fmt.n(ext[0], 2)) + "</b></div>" +
+      "<div class='tip-row'><span class='tip-mute'>this block's breakeven</span><b>" +
+      GD.esc(fmt.n(b.mtm, 2)) + "</b></div>");
 
     return stack(8, [
       row(8, [
@@ -619,9 +656,10 @@
         el("span", { text: "Sits " }),
         strong(fmt.n(Math.abs(toBe), 2) + " ¢/bu", pnlTone(toBe)),
         el("span", {
-          text: " " + (toBe < 0 ? "below" : toBe > 0 ? "above" : "level with") +
-            " this block's " + fmt.n(b.mtm, 2) + " breakeven."
-        })
+          text: " " + (toBe < 0 ? "below" : toBe > 0 ? "above" : "level with") + " this block's "
+        }),
+        el("span", { class: "num", text: fmt.n(b.mtm, 2) }),
+        el("span", { text: " breakeven." })
       ])
     ]);
   }
@@ -652,9 +690,10 @@
           strong(cents(l.cents)),
           live ? el("span", { text: ". " + live.key + " last " }) : null,
           live ? strong(cents(live.last)) : null,
+          live ? el("span", { text: " — " }) : null,
+          live ? el("span", { class: "num", text: fmt.n(Math.abs(distance), 2) + " ¢/bu" }) : null,
           live ? el("span", {
-            text: " — " + fmt.n(Math.abs(distance), 2) + " ¢/bu " +
-              (distance > 0 ? "above the order." : distance < 0 ? "below the order." : "level with the order.")
+            text: " " + (distance > 0 ? "above the order." : distance < 0 ? "below the order." : "level with the order.")
           }) : el("span", { text: "." })
         ])
       ], { background: "var(--accent-soft)", "border-color": "var(--accent-line)" });
@@ -668,10 +707,8 @@
         GD.tipOn(dash, "The workbook books no gain or loss against this leg.");
         return dash;
       }
-      var node = el("span", { class: pnlTone(l.pnl), text: fmt.signedMoney(l.pnl) });
-      GD.tipOn(node, "<b>Gain / loss</b><div class='tip-row'><span class='tip-mute'>to the dollar</span><b>" +
-        GD.esc(sgnUsd(l.pnl)) + "</b></div>");
-      return node;
+      /* To the dollar, not fmt.money's "+$4k": this column is the ledger. */
+      return el("span", { class: "num " + pnlTone(l.pnl), text: sgnUsd(l.pnl) });
     }
 
     return GD.table({
@@ -827,7 +864,9 @@
       return el("span", null, [
         el("span", { text: blockTitle(b) + " breakeven " }),
         el("b", { class: "num", style: { color: "var(--ink)" }, text: fmt.n(b.mtm, 2) }),
-        el("span", { text: live ? " vs " + live.key + " " + cents(live.last) : " ¢/bu" })
+        live ? el("span", { text: " vs " + live.key + " " }) : null,
+        live ? el("b", { class: "num", style: { color: "var(--ink)" }, text: fmt.n(live.last, 2) }) : null,
+        el("span", { text: " ¢/bu" })
       ]);
     });
 
@@ -889,7 +928,7 @@
       body: [
         noteRow("shield", "good", "The legs, the thresholds and the splits",
           "Every leg date, lot count, fill status, cent price, basis and flat price here was read off " +
-          "Pavin's PROCUREMENT TRACKER workbook on 4 Oct 2026 — along with the " +
+          "Pavin's PROCUREMENT TRACKER workbook — along with the " +
           sgnUsd(P.take_profit_usd) + " take profit, the " + sgnUsd(P.loss_cut_usd) +
           " loss cut, the 70/30 flat-and-basis split and both block subtotals.",
           legSource),
@@ -919,20 +958,28 @@
       var filled = sumBy(P.blocks, "filled_lots");
       var open = sumBy(P.blocks, "open_lots");
       var qty = sumBy(P.blocks, "total_qty");
-      var days = P.breached_on ? fmt.daysBetween(P.breached_on, D.built) : null;
+      var days = breachDays(P);
+      var age = breachAge(P);
       var cargoFile = (D.cargoes || []).filter(function (c) { return c.vessel === P.cargo; })[0];
+      /* The cargo berthed on 7 Oct and the dataset was built on the 13th, so the
+         sub-head says "arrived", not "arrives" — read off the dates, not hard-coded,
+         so the sentence stays true if the data moves. */
+      var arrived = fmt.daysBetween(P.arrival, D.built);
+      var arrivalVerb = arrived !== null && arrived >= 0 ? "arrived" : "arrives";
 
       /* ---- 1. head */
       var actions = [];
       if (P.breach) {
         actions.push(GD.chip(
-          "Loss cut breached · " + plural(days, "day", "days"),
+          "Loss cut breached" + (age ? " · " + age : ""),
           "bad", "alert"
         ));
       } else {
         actions.push(GD.chip("Inside both thresholds", "good", "check"));
       }
-      if (cargoFile) {
+      /* Only offer the cross-link if the surface that owns the cargo file is loaded —
+         otherwise the button would navigate off this page and open nothing. */
+      if (cargoFile && GD.showCargo) {
         actions.push(el("button", {
           class: "btn", type: "button",
           onclick: function () {
@@ -955,7 +1002,7 @@
             class: "page-sub",
             text: P.cargo + " · " + P.origin + " · " + P.counterparty +
               " · contracted " + fmt.date(P.contract_date) +
-              " · arrives " + fmt.date(P.arrival) + " at " + portLabel(P.port)
+              " · " + arrivalVerb + " " + fmt.date(P.arrival) + " at " + portLabel(P.port)
           })
         ]),
         el("div", { class: "ph-actions" }, actions)
@@ -978,7 +1025,8 @@
           cell("Shipment window", P.shipment),
           cell("Contract date", fmt.date(P.contract_date)),
           cell("Arrival", fmt.date(P.arrival),
-            "<b>Arrived " + GD.esc(fmt.ago(P.arrival)) + "</b><div class='tip-mute'>" +
+            "<b>" + (arrivalVerb === "arrived" ? "Arrived " : "Arrives ") +
+            GD.esc(fmt.ago(P.arrival)) + "</b><div class='tip-mute'>" +
             GD.esc(portLabel(P.port)) + "</div>"),
           cell("Counterparty", P.counterparty)
         ])]
@@ -1000,12 +1048,15 @@
         GD.esc(sgnThb(P.total_thb)) + "</b></div><div class='tip-row'><span class='tip-mute'>at FX</span><b>" +
         GD.esc(fmt.n(P.fx, 2)) + "</b></div>");
 
+      /* Not the up/down arrows: on this desk a falling price is the good outcome, so
+         a down glyph beside the coral loss cut would read as "good". `scale` is the
+         house glyph for a threshold and `alert` for the one he does not want hit. */
       var thresholdStat = statToned({
         label: "Take profit",
-        icon: "up",
+        icon: "scale",
         value: sgnUsd(P.take_profit_usd),
         delta: [
-          icon("down", 13, 1.75),
+          icon("alert", 13, 1.75),
           el("span", { text: "Loss cut" }),
           el("b", { class: "val-up", text: sgnUsd(P.loss_cut_usd) })
         ]
@@ -1020,14 +1071,17 @@
         breachStat = statToned({
           label: "Breach",
           icon: "alert",
-          value: fmt.n(days, 0),
-          unit: days === 1 ? "day" : "days",
-          aside: el("span", { class: "card-sub", text: "since " + fmt.dateShort(P.breached_on) }),
+          value: days === null ? "Yes" : fmt.n(days, 0),
+          unit: days === null ? null : days === 1 ? "day" : "days",
+          aside: P.breached_on
+            ? el("span", { class: "card-sub num", text: "since " + fmt.dateShort(P.breached_on) })
+            : null,
           delta: [icon("alert", 13, 1.75), el("span", { text: EXCEL_LINE })]
-        }, days >= 7 ? "val-up" : "val-mute");
+        }, days !== null && days >= 7 ? "val-up" : "val-mute");
         GD.tipOn(breachStat, "<b>Through the loss cut</b><div class='tip-row'><span class='tip-mute'>breached</span><b>" +
-          GD.esc(fmt.date(P.breached_on)) + "</b></div><div class='tip-row'><span class='tip-mute'>carried for</span><b>" +
-          GD.esc(plural(days, "day", "days")) + "</b></div><div class='tip-mute'>A workbook has no clock. " + GD.esc(EXCEL_LINE) + ".</div>");
+          GD.esc(fmt.date(P.breached_on)) + "</b></div>" +
+          (age ? "<div class='tip-row'><span class='tip-mute'>carried for</span><b>" + GD.esc(age) + "</b></div>" : "") +
+          "<div class='tip-mute'>A workbook has no clock. " + GD.esc(EXCEL_LINE) + ".</div>");
       } else {
         breachStat = GD.stat({
           label: "Breach",
@@ -1044,10 +1098,10 @@
         icon: "layers",
         value: fmt.n(filled, 0),
         unit: "filled",
-        aside: open ? row(6, [GD.dot("good"), el("span", { class: "card-sub", text: fmt.n(open, 0) + " open" })]) : null,
+        aside: open ? row(6, [GD.dot("good"), el("span", { class: "card-sub num", text: fmt.n(open, 0) + " open" })]) : null,
         delta: [
           icon("file", 13, 1.75),
-          el("span", { text: P.blocks.length + " blocks · " }),
+          el("span", { class: "num", text: plural(P.blocks.length, "block", "blocks") + " · " }),
           el("b", { text: tonnes(qty) })
         ]
       });
@@ -1055,7 +1109,8 @@
         return "<div class='tip-row'><span class='tip-mute'>" + GD.esc(b.instrument) + "</span><b>" +
           GD.esc(fmt.n(b.filled_lots, 0) + " filled" + (b.open_lots ? " · " + fmt.n(b.open_lots, 0) + " open" : "")) +
           "</b></div>";
-      }).join("") + "<div class='tip-row'><span class='tip-mute'>legs</span><b>" + legs.length + "</b></div>");
+      }).join("") + "<div class='tip-row'><span class='tip-mute'>legs</span><b>" +
+        GD.esc(fmt.n(legs.length, 0)) + "</b></div>");
 
       wrap.appendChild(el("div", { class: "grid g-4" }, [posStat, thresholdStat, breachStat, lotsStat]));
 
@@ -1063,7 +1118,8 @@
       wrap.appendChild(GD.card({
         title: "Where the position sits against his own thresholds",
         sub: P.breach
-          ? "Through the loss cut on " + fmt.date(P.breached_on) + " and carried there for " + plural(days, "day", "days")
+          ? "Through the loss cut on " + fmt.date(P.breached_on) +
+            (age ? " and carried there for " + age : "")
           : "Inside both levels",
         actions: [P.breach ? GD.chip("breached", "bad", "alert") : GD.chip("inside", "good", "check")],
         body: [thresholdBar()],

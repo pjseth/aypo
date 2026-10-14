@@ -15,11 +15,10 @@
 
   /* ------------------------------------------------------------------ helpers */
 
-  var MONTH_KEYS = [
-    ["jan", "january"], ["feb", "february"], ["mar", "march"], ["apr", "april"],
-    ["may", "may"], ["jun", "june"], ["jul", "july"], ["aug", "august"],
-    ["sep", "september"], ["oct", "october"], ["nov", "november"], ["dec", "december"]
-  ];
+  /* Three letters is enough: every long form contains its own abbreviation, so
+     "1-31 JANUARY 2027" matches on "jan" without a second needle. */
+  var MONTH_KEYS = ["jan", "feb", "mar", "apr", "may", "jun",
+                    "jul", "aug", "sep", "oct", "nov", "dec"];
 
   /* Shipment windows arrive in whatever shape the supplier typed: "20 DEC - 20 JAN
      2027", "Dec", "1-31 JANUARY 2027", "Nov 20 - Dec 20". Two offers are treated as
@@ -27,8 +26,8 @@
      is stated on screen, which is the point. */
   function monthsIn(text) {
     var low = String(text || "").toLowerCase(), out = [];
-    MONTH_KEYS.forEach(function (pair, i) {
-      if (low.indexOf(pair[0]) >= 0) out.push(i);
+    MONTH_KEYS.forEach(function (key, i) {
+      if (low.indexOf(key) >= 0) out.push(i);
     });
     return out;
   }
@@ -178,19 +177,18 @@
     var box = el("div", {
       style: {
         display: "flex", gap: "12px", padding: "13px 14px",
-        "border-radius": "10px",
+        "border-radius": "var(--r-inner)",
         "background-color": accent ? "var(--accent-soft)" : "var(--surface-2)",
         border: "1px solid " + (accent ? "var(--accent-line)" : "var(--border)")
       }
     }, [
+      /* `.stat-ico` is the shared 26px tile — a shadow ring rather than a border,
+         so these callouts match the note rows on every other surface. Only the
+         ink is per-tone. Stroke 2 because the title beside it is semibold. */
       el("span", {
-        style: {
-          width: "26px", height: "26px", "border-radius": "7px", flex: "none",
-          display: "grid", "place-items": "center",
-          "background-color": accent ? "var(--surface)" : "var(--surface-3)",
-          color: accent ? "var(--accent-2)" : "var(--ink-3)"
-        }
-      }, [icon(cfg.icon || "alert", 14, 1.9)]),
+        class: "stat-ico",
+        style: { color: accent ? "var(--accent-2)" : "var(--ink-3)" }
+      }, [icon(cfg.icon || "alert", 14, 2)]),
       el("div", { style: { flex: "1", "min-width": "0" } }, [
         el("div", {
           style: {
@@ -282,7 +280,7 @@
     var track = el("div", {
       role: "img", "aria-label": aria,
       style: {
-        position: "relative", height: "44px", "border-radius": "10px",
+        position: "relative", height: "44px", "border-radius": "var(--r-inner)",
         "background-color": "var(--surface-2)", border: "1px solid var(--border)",
         overflow: "hidden"
       }
@@ -347,7 +345,7 @@
         function bullets(items) {
           return el("ul", { style: { display: "grid", gap: "6px" } }, items.map(function (t) {
             return el("li", { style: { display: "flex", gap: "8px", "font-size": "var(--t-sm)", color: "var(--ink-2)" } }, [
-              el("span", { style: { color: "var(--accent)", flex: "none" } }, [icon("check", 14, 2)]),
+              el("span", { style: { color: "var(--accent)", flex: "none" } }, [icon("check", 14, 1.5)]),
               el("span", { text: t })
             ]);
           }));
@@ -483,10 +481,10 @@
           icon: "savings",
           hero: true,
           delta: [
-            icon("sparkle", 13, 2),
-            el("span", { text: fmt.n(D.savings.length) + " logged actions · " }),
+            icon("sparkle", 13, 1.75),
+            el("span", { class: "num", text: fmt.n(D.savings.length) + " logged actions · " }),
             el("b", { text: fmt.usd(avg) + "/t" }),
-            el("span", { text: " across " + fmt.n(qty) + " t" })
+            el("span", { class: "num", text: " across " + fmt.n(qty) + " t" })
           ]
         }),
         GD.stat({
@@ -495,8 +493,11 @@
           unit: "a year",
           icon: "dollar",
           delta: [
-            icon("up", 13, 2),
-            el("span", { text: fmt.usd0(adv.fee_per_cargo) + " a cargo at " +
+            /* `scale`, not an arrow: an up-arrow in a delta strip reads as a
+               trend, and nothing here is trending — this is a derivation. */
+            icon("scale", 13, 1.75),
+            el("span", { class: "num",
+                         text: fmt.usd0(adv.fee_per_cargo) + " a cargo at " +
                                fmt.usd(econ.advisor_share_usd_mt) + "/t of a " +
                                fmt.usd(econ.advisor_typical_saving_usd_mt, 0) + "/t saving" })
           ]
@@ -507,8 +508,8 @@
           unit: "a year",
           icon: "calendar",
           delta: [
-            icon("clock", 13, 2),
-            el("span", { text: fmt.usd0(econ.advisor_retainer_usd_month) + " a month" })
+            icon("clock", 13, 1.75),
+            el("span", { class: "num", text: fmt.usd0(econ.advisor_retainer_usd_month) + " a month" })
           ]
         })
       ]);
@@ -526,7 +527,10 @@
               fmt.n(adv.fee_per_year / adv.retainer_year, 1) + "× the retainer, and it is " +
               "charged on a saving this desk already produces itself: the " +
               fmt.n(D.savings.length) + " actions below averaged " + fmt.usd(avg) + "/t.",
-        extra: "The year figure assumes ten cargoes; the origin plan actually runs " +
+        /* "ten" is not a constant: it is what adv.fee_per_year / adv.fee_per_cargo
+           comes to. Derive it, so the sentence cannot drift from the data. */
+        extra: "The year figure assumes " + fmt.n(adv.fee_per_year / adv.fee_per_cargo) +
+               " cargoes; the origin plan actually runs " +
                fmt.n(cargoesPerYear(), 1) + " a year across " +
                D.profile.origins.map(function (o) { return o.label; }).join(", ") + "."
       }));
@@ -572,8 +576,10 @@
             render: function (r) {
               var cell = el("b", { class: GD.toneFor(r.total, true), text: fmt.money(r.total) });
               GD.tipOn(cell, "<b>" + GD.esc(fmt.usd0(r.total)) + "</b>" +
-                "<div class='tip-row'><span class='tip-mute'>" + GD.esc(fmt.n(r.qty) + " t") +
-                " × " + GD.esc(fmt.usd(r.usd_mt)) + "</span></div>");
+                "<div class='tip-row'><span class='tip-mute'>quantity</span><b>" +
+                GD.esc(fmt.n(r.qty) + " t") + "</b></div>" +
+                "<div class='tip-row'><span class='tip-mute'>saving</span><b>" +
+                GD.esc(fmt.usd(r.usd_mt) + "/t") + "</b></div>");
               return cell;
             }
           },
@@ -597,11 +603,11 @@
         body: [ledger],
         foot: [
           icon("savings", 13, 1.75),
-          el("span", { text: fmt.n(D.savings.length) + " actions" }),
+          el("span", { class: "num", text: fmt.n(D.savings.length) + " actions" }),
           el("span", { style: { color: "var(--ink-4)" }, text: "·" }),
-          el("span", { text: fmt.n(qty) + " t" }),
+          el("span", { class: "num", text: fmt.n(qty) + " t" }),
           el("span", { style: { color: "var(--ink-4)" }, text: "·" }),
-          el("span", { text: fmt.usd(avg) + "/t weighted average" }),
+          el("span", { class: "num", text: fmt.usd(avg) + "/t weighted average" }),
           el("div", { style: { flex: "1" } }),
           el("span", { class: "label", text: "Total saved" }),
           el("b", {
@@ -614,95 +620,113 @@
 
       /* ------------------------------------------------------- the breakdown */
 
-      var top = kinds.slice().sort(function (a, b) { return b.total - a.total; })[0];
-      var compoParts = kinds.map(function (k) {
-        return { name: kindMeta(k.kind).label, value: k.total, color: kindMeta(k.kind).color };
-      });
-      var bar = GD.compo(compoParts, D.savings_total);
-      /* core's compo tooltip is written for $/tonne segments; these segments are
-         whole dollars, so re-attach a correct one. The later listener wins. */
-      GD.qsa("span", bar).forEach(function (seg, i) {
-        var p = compoParts.filter(function (x) { return x.value > 0; })[i];
-        if (!p) return;
-        GD.tipOn(seg, "<b>" + GD.esc(p.name) + "</b>" +
-          "<div class='tip-row'><span class='tip-mute'>saved</span><b>" + GD.esc(fmt.usd0(p.value)) + "</b></div>" +
-          "<div class='tip-row'><span class='tip-mute'>share of total</span><b>" +
-          GD.esc(fmt.pct(p.value / D.savings_total)) + "</b></div>");
-      });
+      /* The dataset always carries actions. The guard is here so an empty ledger
+         shows an empty table rather than taking the surface down on `top.kind`. */
+      if (kinds.length) {
+        var top = kinds.slice().sort(function (a, b) { return b.total - a.total; })[0];
+        var compoParts = kinds.map(function (k) {
+          return { name: kindMeta(k.kind).label, value: k.total, color: kindMeta(k.kind).color };
+        });
+        var bar = GD.compo(compoParts, D.savings_total);
+        /* core labels every compo segment "per tonne", which is right for a $/t
+           build-up and wrong here, where the segments are whole dollars. Clone
+           each segment to drop core's listeners outright — a second `tipOn` would
+           leave the wrong tooltip firing first and make the result depend on
+           listener order — then attach the dollar version, and the same two
+           numbers again as the accessible name for the focusable segment. */
+        var liveParts = compoParts.filter(function (p) { return p.value > 0; });
+        GD.qsa("span", bar).forEach(function (seg, i) {
+          var p = liveParts[i];
+          if (!p) return;
+          var fresh = seg.cloneNode(true);
+          /* Freight is $540 of $832,540 — 0.065%, which is a third of a pixel and
+             reads as "freight produced nothing" against a legend that names it.
+             A floor of 3px keeps the smallest lever findable; flex-shrink takes
+             the width back off the big segments, so the bar still fills exactly. */
+          fresh.style.setProperty("min-width", "3px");
+          fresh.setAttribute("aria-label", p.name + " — " + fmt.usd0(p.value) +
+            " saved, " + fmt.pct(p.value / D.savings_total) + " of the total");
+          GD.tipOn(fresh, "<b>" + GD.esc(p.name) + "</b>" +
+            "<div class='tip-row'><span class='tip-mute'>saved</span><b>" + GD.esc(fmt.usd0(p.value)) + "</b></div>" +
+            "<div class='tip-row'><span class='tip-mute'>share of total</span><b>" +
+            GD.esc(fmt.pct(p.value / D.savings_total)) + "</b></div>");
+          bar.replaceChild(fresh, seg);
+        });
 
-      var chrono = D.savings.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-      var perTonne = chrono.map(function (s) { return s.usd_mt; });
-      var bestIdx = 0, worstIdx = 0;
-      perTonne.forEach(function (v, i) {
-        if (v > perTonne[bestIdx]) bestIdx = i;
-        if (v < perTonne[worstIdx]) worstIdx = i;
-      });
+        var chrono = D.savings.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+        var perTonne = chrono.map(function (s) { return s.usd_mt; });
+        var bestIdx = 0, worstIdx = 0;
+        perTonne.forEach(function (v, i) {
+          if (v > perTonne[bestIdx]) bestIdx = i;
+          if (v < perTonne[worstIdx]) worstIdx = i;
+        });
 
-      var breakdownBody = [
-        bar,
-        GD.legend(compoParts.map(function (p) { return { name: p.name, color: p.color }; })),
-        el("div", {
-          style: {
-            display: "grid", gap: "0", "border-radius": "10px",
-            border: "1px solid var(--border)", overflow: "hidden"
-          }
-        }, kinds.map(function (k, i) {
-          var m = kindMeta(k.kind);
-          return el("div", {
+        var breakdownBody = [
+          bar,
+          GD.legend(compoParts.map(function (p) { return { name: p.name, color: p.color }; })),
+          el("div", {
             style: {
-              display: "flex", "align-items": "center", gap: "10px",
-              padding: "9px 12px",
-              "border-top": i ? "1px solid var(--border)" : "0",
-              "background-color": "var(--surface)"
+              display: "grid", gap: "0", "border-radius": "var(--r-inner)",
+              border: "1px solid var(--border)", overflow: "hidden"
+            }
+          }, kinds.map(function (k, i) {
+            var m = kindMeta(k.kind);
+            return el("div", {
+              style: {
+                display: "flex", "align-items": "center", gap: "10px",
+                padding: "9px 12px",
+                "border-top": i ? "1px solid var(--border)" : "0",
+                "background-color": "var(--surface)"
+              }
+            }, [
+              swatch(m.color),
+              el("b", { style: { "font-size": "var(--t-sm)", "min-width": "64px" }, text: m.label }),
+              el("span", { style: { "font-size": "var(--t-xs)", color: "var(--ink-3)", flex: "1" },
+                           text: m.blurb + " · " + fmt.n(k.count) + (k.count === 1 ? " action" : " actions") }),
+              el("span", { class: "num", style: { "font-size": "var(--t-xs)", color: "var(--ink-3)" },
+                           text: fmt.pct(k.total / D.savings_total) }),
+              el("b", { class: "num " + GD.toneFor(k.total, true), style: { "min-width": "66px", "text-align": "right" },
+                        text: fmt.usd0(k.total) })
+            ]);
+          })),
+          el("div", {
+            style: {
+              display: "flex", "align-items": "center", gap: "16px", "flex-wrap": "wrap",
+              padding: "12px 14px", "border-radius": "var(--r-inner)",
+              "background-color": "var(--surface-2)", border: "1px solid var(--border)"
             }
           }, [
-            swatch(m.color),
-            el("b", { style: { "font-size": "var(--t-sm)", "min-width": "64px" }, text: m.label }),
-            el("span", { style: { "font-size": "var(--t-xs)", color: "var(--ink-3)", flex: "1" },
-                         text: m.blurb + " · " + fmt.n(k.count) + (k.count === 1 ? " action" : " actions") }),
-            el("span", { class: "num", style: { "font-size": "var(--t-xs)", color: "var(--ink-3)" },
-                         text: fmt.pct(k.total / D.savings_total) }),
-            el("b", { class: "num " + GD.toneFor(k.total, true), style: { "min-width": "66px", "text-align": "right" },
-                      text: fmt.usd0(k.total) })
-          ]);
-        })),
-        el("div", {
-          style: {
-            display: "flex", "align-items": "center", gap: "16px", "flex-wrap": "wrap",
-            padding: "12px 14px", "border-radius": "10px",
-            "background-color": "var(--surface-2)", border: "1px solid var(--border)"
-          }
-        }, [
-          el("div", { style: { flex: "1", "min-width": "220px" } }, [
-            el("div", { class: "label", style: { "margin-bottom": "4px" }, text: "Saving per action, $/t" }),
-            el("p", {
-              style: { "font-size": "var(--t-xs)", color: "var(--ink-3)" },
-              text: "Oldest first. Tallest bar " + fmt.usd(perTonne[bestIdx]) + "/t on " +
-                    fmt.date(chrono[bestIdx].date) + "; shortest " + fmt.usd(perTonne[worstIdx]) +
-                    "/t on " + fmt.date(chrono[worstIdx].date) + ". Bars are scaled between those two."
+            el("div", { style: { flex: "1", "min-width": "220px" } }, [
+              el("div", { class: "label", style: { "margin-bottom": "4px" }, text: "Saving per action, $/t" }),
+              el("p", {
+                style: { "font-size": "var(--t-xs)", color: "var(--ink-3)" },
+                text: "Oldest first. Tallest bar " + fmt.usd(perTonne[bestIdx]) + "/t on " +
+                      fmt.date(chrono[bestIdx].date) + "; shortest " + fmt.usd(perTonne[worstIdx]) +
+                      "/t on " + fmt.date(chrono[worstIdx].date) + ". Bars are scaled between those two."
+              })
+            ]),
+            GD.chart.barSpark(perTonne, {
+              w: 196, h: 48, gap: 5, take: perTonne.length, highlight: bestIdx,
+              muted: "var(--border-2)", label: fmt.usd(perTonne[bestIdx]) + "/t"
             })
           ]),
-          GD.chart.barSpark(perTonne, {
-            w: 196, h: 48, gap: 5, take: perTonne.length, highlight: bestIdx,
-            muted: "var(--border-2)", label: fmt.usd(perTonne[bestIdx]) + "/t"
+          el("p", {
+            style: { "font-size": "var(--t-sm)", color: "var(--ink-2)" },
+            text: kindMeta(top.kind).label + " is the lever that produced the most: " +
+                  fmt.usd0(top.total) + " of " + fmt.usd0(D.savings_total) + ", " +
+                  fmt.pct(top.total / D.savings_total) + " of the total, from " +
+                  fmt.n(top.count) + (top.count === 1 ? " action" : " actions") + " — " +
+                  "and its best single action was worth " + fmt.usd(top.best) + "/t. " +
+                  leastSentence(kinds)
           })
-        ]),
-        el("p", {
-          style: { "font-size": "var(--t-sm)", color: "var(--ink-2)" },
-          text: kindMeta(top.kind).label + " is the lever that produced the most: " +
-                fmt.usd0(top.total) + " of " + fmt.usd0(D.savings_total) + ", " +
-                fmt.pct(top.total / D.savings_total) + " of the total, from " +
-                fmt.n(top.count) + (top.count === 1 ? " action" : " actions") + " — " +
-                "and its best single action was worth " + fmt.usd(top.best) + "/t. " +
-                leastSentence(kinds)
-        })
-      ];
+        ];
 
-      wrap.appendChild(GD.card({
-        title: "Which lever did the work",
-        sub: "The same " + fmt.usd0(D.savings_total) + ", split by the kind of action that produced it.",
-        body: [el("div", { style: { display: "grid", gap: "14px" } }, breakdownBody)]
-      }));
+        wrap.appendChild(GD.card({
+          title: "Which lever did the work",
+          sub: "The same " + fmt.usd0(D.savings_total) + ", split by the kind of action that produced it.",
+          body: [el("div", { style: { display: "grid", gap: "14px" } }, breakdownBody)]
+        }));
+      }
 
       /* -------------------------------------------------- THE BENCHMARK PANEL */
 
@@ -715,6 +739,9 @@
             el("div", { text: "No approved-supplier offers are held, so no band can be inferred." })
           ])]
         }));
+        /* The honest answer to "there is no band" is the list of things that would
+           produce one, so it ships on this path too rather than being returned past. */
+        wrap.appendChild(sourcesCard());
         return;
       }
 
@@ -736,6 +763,10 @@
       }));
 
       function drawPanel() {
+        /* The panel is torn down and rebuilt, and a tooltip only hides on its own
+           element's pointerleave — which never fires if that element is removed
+           while the pointer is still over it. Hide it before the nodes go. */
+        GD.tip.hide();
         GD.clear(panelBody);
         var b = benchFor(state.code);
         if (!b) return;
@@ -745,16 +776,21 @@
         var diff = portDiff(port);
 
         panelBody.appendChild(el("div", { class: "statline", style: {
-          "border-radius": "10px", border: "1px solid var(--border)", overflow: "hidden"
+          "border-radius": "var(--r-inner)", border: "1px solid var(--border)", overflow: "hidden"
         } }, [
           statCell("UFM best laid-in", fmt.usd(b.ufm) + " /t", "",
                    b.anchor.supplier + " · " + b.anchor.shipment),
-          statCell("Estimated peer band", fmt.usd(b.floor) + " – " + fmt.usd(b.ceiling), "",
+          /* One offer makes "$328.00 – $328.00" — a range the data does not
+             contain. The table prints "—" for these rows; so does the panel. */
+          statCell("Estimated peer band",
+                   b.hasSpread ? fmt.usd(b.floor) + " – " + fmt.usd(b.ceiling) : "—", "",
                    b.hasSpread ? "median → highest of " + fmt.n(b.offers.length) + " offers"
                                : "one offer only — no spread"),
-          statCell("Below the band floor", fmt.usd(b.edge) + " /t", tone,
+          /* With one offer there is no floor, so there is no distance from it.
+             "—", not "$0.00/t": a zero would read as a measured dead heat. */
+          statCell("Below the band floor", b.hasSpread ? fmt.usd(b.edge) + " /t" : "—", tone,
                    b.hasSpread ? "against the median offer" : "nothing to compare against"),
-          statCell("On UFM's own tonnes", fmt.signedMoney(b.edgeUsd), tone,
+          statCell("On UFM's own tonnes", b.hasSpread ? fmt.signedMoney(b.edgeUsd) : "—", tone,
                    fmt.n(b.tonnes) + " t a cargo" + (b.origin ? " · " + b.origin.label : ""))
         ]));
 
@@ -818,17 +854,37 @@
         emptyText: "No classes with approved-supplier offers.",
         rowClass: function (r) { return r.code === state.code ? "is-selected" : null; },
         onRow: function (r) {
+          /* `update` rebuilds the tbody, which destroys the row that was just
+             activated — so a keyboard user's focus falls to <body> and the next
+             Tab restarts from the top of the page. Put it back on the new row. */
+          var fromKeyboard = document.activeElement &&
+                             classTable.contains(document.activeElement);
           state.code = r.code;
           picker.value = r.code;
           drawPanel();
           classTable.update(benchRows);
+          if (fromKeyboard) {
+            var again = GD.qs("tbody tr.is-selected", classTable);
+            if (again) again.focus();
+          }
         },
         cols: [
           {
-            key: "code", label: "Class", width: "150px",
+            key: "code", label: "Class", width: "172px",
             render: function (r) {
               return el("div", null, [
-                el("b", { class: "nowrap", style: { color: "var(--ink)" }, text: r.cls.code }),
+                el("div", { style: { display: "flex", "align-items": "center", gap: "6px" } }, [
+                  el("b", { class: "nowrap", style: { color: "var(--ink)" }, text: r.cls.code }),
+                  /* the selected row is tinted, and nothing on this app carries a
+                     state in hue alone — so the row that is in the panel says so. */
+                  r.code === state.code ? el("span", {
+                    style: {
+                      display: "inline-flex", "align-items": "center", gap: "3px",
+                      "font-size": "var(--t-xs)", "font-weight": "600",
+                      color: "var(--accent-2)", "white-space": "nowrap"
+                    }
+                  }, [icon("eye", 11, 2), el("span", { text: "in panel" })]) : null
+                ]),
                 el("div", { style: { "font-size": "var(--t-xs)", color: "var(--ink-4)" },
                             text: r.cls.label })
               ]);
@@ -867,8 +923,18 @@
           {
             key: "edge", label: "Below floor", num: true, width: "100px",
             render: function (r) {
+              /* no second offer, no floor, nothing to be below — and a "$0.00/t"
+                 here would read as a measured dead heat rather than no evidence. */
+              if (!r.hasSpread) return el("span", { style: { color: "var(--ink-4)" }, text: "—" });
+              /* `edge` is median − minimum, so it is never negative: the only two
+                 states are "below the floor" and "level with it". The old dot had
+                 a "bad" arm that no arithmetic could reach, and at exactly zero it
+                 went amber while GD.toneFor went grey — two colours, one number. */
+              if (!r.edge) {
+                return el("span", { class: "nowrap val-mute", text: fmt.usd(0) + "/t" });
+              }
               return el("span", { class: "nowrap" }, [
-                GD.dot(r.edge > 0 ? "good" : "warn"),
+                GD.dot("good"),
                 el("b", { class: GD.toneFor(r.edge, true), style: { "margin-left": "6px" },
                           text: fmt.usd(r.edge) + "/t" })
               ]);
@@ -877,6 +943,7 @@
           {
             key: "edgeUsd", label: "On UFM tonnes", num: true, width: "118px",
             render: function (r) {
+              if (!r.hasSpread) return el("span", { style: { color: "var(--ink-4)" }, text: "—" });
               var cell = el("b", { class: GD.toneFor(r.edgeUsd, true), text: fmt.signedMoney(r.edgeUsd) });
               GD.tipOn(cell, "<b>" + GD.esc(r.cls.code) + "</b>" +
                 "<div class='tip-row'><span class='tip-mute'>below floor</span><b>" +
@@ -919,65 +986,66 @@
 
       /* ------------------------------------------------ what would make it real */
 
-      var sources = [
-        {
-          icon: "file",
-          title: "Thai customs import declarations",
-          body: "Wheat import declarations carry importer, quantity and declared value per " +
-                "shipment. That is a laid-in cost per tonne for every mill in the country, " +
-                "from a source none of them controls.",
-          meta: "Route: a licensed customs-data reseller, or a standing request against the " +
-                "Customs Department's import statistics. Monthly, with a lag."
-        },
-        {
-          icon: "ship",
-          title: "Vessel line-ups and AIS",
-          body: "Berth line-ups at " + D.profile.ports.map(function (p) { return p.code; }).join(", ") +
-                " plus AIS tracks tie a cargo to a mill, an origin and a laycan. That dates a " +
-                "competitor's purchase even before a price is attached to it.",
-          meta: "Route: a shipbroker line-up feed, plus commercial AIS. Daily, and it is the " +
-                "cheapest of the three."
-        },
-        {
-          icon: "users",
-          title: "Co-load cargo visibility",
-          body: coloadSentence(),
-          meta: "Route: a data-sharing arrangement inside the pool UFM is already in — the " +
-                "allocation and freight split is a peer cost basis the mill is contractually " +
-                "standing next to."
-        }
-      ];
-
-      wrap.appendChild(GD.card({
-        title: "What would make this real",
-        sub: "Three sources that would turn the band above into a measurement. None of them is in this dataset today.",
-        flush: true,
-        body: sources.map(function (s) {
-          return el("div", { class: "note-row" }, [
-            el("span", {
-              style: {
-                width: "28px", height: "28px", "border-radius": "8px", flex: "none",
-                display: "grid", "place-items": "center",
-                "background-color": "var(--surface-3)", color: "var(--ink-2)"
-              }
-            }, [icon(s.icon, 15, 1.8)]),
-            el("div", { class: "nr-body" }, [
-              el("div", { class: "nr-head" }, [
-                el("h4", { text: s.title }),
-                GD.chip("not held", "outline", "x")
-              ]),
-              el("p", { text: s.body }),
-              el("div", { class: "nr-meta", text: s.meta })
-            ])
-          ]);
-        }),
-        foot: [
-          icon("shield", 13, 1.75),
-          el("span", { text: "Until one of these lands, the benchmark panel is an estimate and is labelled as one on screen." })
-        ]
-      }));
+      wrap.appendChild(sourcesCard());
     }
   });
+
+  /* The three sources that would turn the inferred band into a measurement.
+     A function, not an inline block, because both the benchmark path and the
+     no-offers path have to show it — an early `return` used to eat it. */
+  function sourcesCard() {
+    var sources = [
+      {
+        icon: "file",
+        title: "Thai customs import declarations",
+        body: "Wheat import declarations carry importer, quantity and declared value per " +
+              "shipment. That is a laid-in cost per tonne for every mill in the country, " +
+              "from a source none of them controls.",
+        meta: "Route: a licensed customs-data reseller, or a standing request against the " +
+              "Customs Department's import statistics. Monthly, with a lag."
+      },
+      {
+        icon: "ship",
+        title: "Vessel line-ups and AIS",
+        body: "Berth line-ups at " + D.profile.ports.map(function (p) { return p.code; }).join(", ") +
+              " plus AIS tracks tie a cargo to a mill, an origin and a laycan. That dates a " +
+              "competitor's purchase even before a price is attached to it.",
+        meta: "Route: a shipbroker line-up feed, plus commercial AIS. Daily, and it is the " +
+              "cheapest of the three."
+      },
+      {
+        icon: "users",
+        title: "Co-load cargo visibility",
+        body: coloadSentence(),
+        meta: "Route: a data-sharing arrangement inside the pool UFM is already in — the " +
+              "allocation and freight split is a peer cost basis the mill is contractually " +
+              "standing next to."
+      }
+    ];
+    return GD.card({
+      title: "What would make this real",
+      sub: "Three sources that would turn the band on this page into a measurement. " +
+           "None of them is in this dataset today.",
+      flush: true,
+      body: sources.map(function (s) {
+        return el("div", { class: "note-row" }, [
+          el("span", { class: "stat-ico" }, [icon(s.icon, 14, 2)]),
+          el("div", { class: "nr-body" }, [
+            el("div", { class: "nr-head" }, [
+              el("h4", { text: s.title }),
+              GD.chip("not held", "outline", "x")
+            ]),
+            el("p", { text: s.body }),
+            el("div", { class: "nr-meta", text: s.meta })
+          ])
+        ]);
+      }),
+      foot: [
+        icon("shield", 13, 1.75),
+        el("span", { text: "Until one of these lands, the benchmark panel is an estimate and is labelled as one on screen." })
+      ]
+    });
+  }
 
   /* ----------------------------------------------------- sentence generators */
 

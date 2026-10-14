@@ -46,13 +46,16 @@
   }
   function plural(n, one, many) { return fmt.n(n, 0) + " " + (n === 1 ? one : many); }
 
-  /* .stat-delta is a single non-wrapping flex row and these tiles put three
-     facts in it, so the content rides inside its own wrapping box. */
+  /* .stat-delta wraps at its own 6px gap and puts tabular figures on <b> only.
+     These tiles pack three facts into it, so the content rides in its own box
+     with a tighter gap and equal-width digits on every number, not just the
+     bold ones — otherwise "cut at −$25,000" sits on proportional digits. */
   function wrapRow(kids) {
     return el("div", {
       style: {
         display: "flex", "flex-wrap": "wrap", "align-items": "center",
-        "column-gap": "5px", "row-gap": "1px", "min-width": "0"
+        "column-gap": "5px", "row-gap": "1px", "min-width": "0",
+        "font-variant-numeric": "tabular-nums"
       }
     }, kids);
   }
@@ -75,11 +78,15 @@
     if (v) v.style.setProperty("white-space", "nowrap");
     return st;
   }
+  /* .btn is 500 and .btn-primary is 600, so every glyph inside a button is
+     drawn at stroke 2 — the weight the icon set pairs with medium/semibold
+     text. A 1.75 glyph beside a 500 label reads a shade too light next to the
+     primary button sitting right beside it. */
   function goBtn(label, route, ico, cls) {
     return el("button", {
       class: cls || "btn btn-sm", type: "button",
       onclick: function () { GD.go(route); }
-    }, [ico ? icon(ico, 13, 1.75) : null, label, icon("chevR", 12, 1.9)]);
+    }, [ico ? icon(ico, 13, 2) : null, label, icon("chevR", 12, 2)]);
   }
 
   /* --------------------------------------------------------- derivations */
@@ -137,26 +144,33 @@
       var d = fmt.daysBetween(q.received, D.built);
       return d !== null && d <= 30;
     });
-    if (win.length < 2) win = qs;
+    /* One indication inside 30 days is not an average, so the window widens to
+       the whole class — and then the copy has to stop calling it a 30-day
+       average, because it would not be one. */
+    var is30 = win.length >= 2;
+    if (!is30) win = qs;
     var sum = 0;
     win.forEach(function (q) { sum += q.flat; });
     var avg = sum / win.length;
 
-    /* Bars are capped so a heavily-quoted class cannot overflow the sparkline;
-       the highlight index is moved with the slice. */
-    var flats = qs.map(function (q) { return q.flat; });
-    var hi = qs.indexOf(low);
+    /* Bars are capped so a heavily-quoted class cannot overflow the sparkline.
+       The window is the most recent MAXB indications, slid back far enough to
+       keep the lowest one inside it: slicing blind would push the highlight off
+       the front and the bar labelled "best" would be whichever landed last.
+       The high is the real maximum of the drawn bars, not chart.extent's padded
+       one, because the copy quotes it as a price. */
+    var all = qs.map(function (q) { return q.flat; });
     var MAXB = 12;
-    if (flats.length > MAXB) {
-      hi = hi - (flats.length - MAXB);
-      flats = flats.slice(-MAXB);
-      if (hi < 0) hi = flats.length - 1;
-    }
-    var ex = GD.chart.extent(flats);
+    var lowAt = qs.indexOf(low);
+    var start = Math.max(0, all.length - MAXB);
+    if (lowAt < start) start = lowAt;
+    var flats = all.slice(start, start + MAXB);
     return {
-      cls: top.cls, n: top.n, quote: low, avg: avg, window: win.length,
-      gap: low.flat - avg, flats: flats, hi: hi, lo: ex[0], top: ex[1],
-      first: qs[0], newest: qs[qs.length - 1]
+      cls: top.cls, quote: low, avg: avg, window: win.length,
+      avgLabel: is30 ? "the 30-day average" : "the average of every indication on the class",
+      avgShort: is30 ? "30-day average" : "average, all indications",
+      gap: low.flat - avg, flats: flats, hi: lowAt - start,
+      top: Math.max.apply(null, flats), total: all.length
     };
   }
   /* The one futures leg still resting unfilled, and how far the market is from
@@ -303,7 +317,9 @@
         rows.push({
           agent: "clerk", tone: "bad", ico: "alert", sev: "Claim",
           statement: c.vessel + " — " + v.field + " printed " + v.certificate + " against " + v.contract,
-          detail: v.note + (tonnes ? " " + fmt.n(hold.lb, 0) + " lb ≈ " + fmt.n(tonnes, 0) + " t" +
+          /* v.note already carries the pound weight, so the detail converts it
+             rather than printing the same figure twice. */
+          detail: v.note + (tonnes ? " The parcel is " + fmt.n(tonnes, 0) + " t" +
             (px ? ", at the " + fmt.usd(px) + "/t contract price on that block" : "") + "." : "") +
             (hold ? " Certificate " + hold.cert + "." : "") +
             " The certificate numbers and the pack are the mill's own; this variance is an illustration " +
@@ -351,13 +367,19 @@
       ? fmt.n(perYear, 0) : fmt.n(Math.floor(perYear), 0) + "–" + fmt.n(Math.ceil(perYear), 0)) : "—";
     var move = (ECON.move_usd_mt || 5) * CARGO_MT;
 
-    var cargoSpan = el("span", { text: cargoes + " cargoes a year" });
+    /* cursor:help is the only affordance these two carry — they look like the
+       rest of the sub-head, and without it the breakdown behind them is
+       undiscoverable. Applied to every plain-text tooltip target on the page. */
+    var cargoSpan = el("span", { style: { cursor: "help" }, text: cargoes + " cargoes a year" });
     GD.tipOn(cargoSpan, "<b>The buying year</b>" +
       ((D.profile && D.profile.origins) || []).map(function (o) {
         return tipRow(o.code + " · " + fmt.n(o.cargo_mt, 0) + " t", fmt.n(o.per_year, 1) + " a year");
       }).join(""));
 
-    var moveSpan = el("span", { text: fmt.usd0(ECON.move_usd_mt || 5) + "/t = " + fmt.usd0(move) });
+    var moveSpan = el("span", {
+      style: { cursor: "help" },
+      text: fmt.usd0(ECON.move_usd_mt || 5) + "/t = " + fmt.usd0(move)
+    });
     GD.tipOn(moveSpan, "<b>Why a dollar matters</b>" +
       tipRow("one cargo", fmt.n(CARGO_MT, 0) + " t") +
       tipRow("a $1/t move", fmt.usd0(CARGO_MT)) +
@@ -377,7 +399,7 @@
     return el("div", { class: "page-head" }, [
       el("div", { class: "ph-text" }, [
         el("h1", { class: "page-title", text: "Morning brief" }),
-        el("div", { class: "page-sub", style: { display: "flex", "flex-wrap": "wrap", "align-items": "center", "column-gap": "7px", "row-gap": "2px" } }, [
+        el("div", { class: "page-sub", style: { display: "flex", "flex-wrap": "wrap", "align-items": "center", "column-gap": "7px", "row-gap": "2px", "font-variant-numeric": "tabular-nums" } }, [
           el("b", { style: { color: "var(--ink-2)", "font-weight": "600" }, text: fmt.date(D.built) }),
           sep(), cargoSpan,
           sep(), el("span", { text: "wheat is " + fmt.pct(ECON.wheat_share_of_cost || 0.8, 0) + " of mill cost" }),
@@ -389,7 +411,7 @@
         el("button", {
           class: "btn btn-ghost", type: "button",
           onclick: function () { GD.go("quotes"); }
-        }, [icon("quotes", 14, 1.75), "Open quote board"])
+        }, [icon("quotes", 14, 2), "Open quote board"])
       ])
     ]);
   }
@@ -403,10 +425,11 @@
     var tone = GD.toneFor(c.gap);
     var perCargo = Math.abs(c.gap) * CARGO_MT;
 
-    /* Each bar is one indication, drawn as its discount to the month's high, so
-       taller means cheaper — the same direction as every other green on this
-       page. Plotting raw flats would put the bar that matters, the lowest, flat
-       on the floor. The transform is stated in the label and the tooltip. */
+    /* Each bar is one indication, drawn as its discount to the highest of the
+       bars shown, so taller means cheaper — the same direction as every other
+       green on this page. Plotting raw flats would put the bar that matters,
+       the lowest, flat on the floor. The transform is stated in the tooltip
+       and in the sparkline's accessible description. */
     var disc = c.flats.map(function (f) { return c.top - f; });
     /* The label is not decoration: it reserves the headroom barSpark needs for
        the endpoint dot, which would otherwise clip off the top of a bar that is
@@ -418,14 +441,20 @@
     });
     var aside = el("span", {
       role: "img", style: { flex: "none" },
-      "aria-label": plural(c.flats.length, "indication", "indications") + " on " + c.cls +
-        ", each shown as its discount to the month's high of " + fmt.usd(c.top) +
-        ". The highlighted bar is the latest at " + fmt.usd(c.quote.flat) + ", " +
-        fmt.usd(c.top - c.quote.flat) + " below."
+      "aria-label": (c.flats.length < c.total
+          ? "The last " + plural(c.flats.length, "indication", "indications") + " of " +
+            fmt.n(c.total, 0)
+          : plural(c.flats.length, "indication", "indications")) +
+        " on " + c.cls + ", each drawn as its discount to the highest of them, " +
+        fmt.usd(c.top) + ". The highlighted bar is the lowest, " + fmt.usd(c.quote.flat) +
+        " — " + fmt.usd(c.top - c.quote.flat) + " below."
     }, [bars]);
 
+    /* Not "today": the best standing indication is routinely days or weeks old,
+       so the label must not claim a print from this morning. The date it was
+       quoted rides in the tooltip instead. */
     var st = GD.stat({
-      label: "Cheapest laid-in today",
+      label: "Cheapest laid-in",
       value: fmt.usd(c.quote.flat), unit: "/t",
       icon: "wheat", aside: aside,
       delta: [wrapRow([
@@ -434,7 +463,7 @@
           icon(below ? "down" : "up", 12, 2),
           el("b", { text: fmt.usd(Math.abs(c.gap)) + "/t" })
         ]),
-        el("span", { text: (below ? "below" : "above") + " the 30-day average" }), sep(),
+        el("span", { text: (below ? "below " : "above ") + c.avgLabel }), sep(),
         el("b", { class: tone, text: fmt.money(perCargo) }),
         el("span", { text: "a cargo" })
       ])],
@@ -443,9 +472,9 @@
     GD.tipOn(st, "<b>" + GD.esc(c.cls) + " — the class the desk has quoted most</b>" +
       tipRow("best flat", fmt.usd(c.quote.flat) + "/t") +
       tipRow("from", c.quote.supplier + ", " + fmt.dateShort(c.quote.received)) +
-      tipRow("30-day average", fmt.usd(c.avg) + "/t over " + plural(c.window, "quote", "quotes")) +
+      tipRow(c.avgShort, fmt.usd(c.avg) + "/t over " + plural(c.window, "quote", "quotes")) +
       tipRow("gap", perT(c.gap) + " · " + moneyS(c.gap * CARGO_MT) + " a cargo") +
-      tipRow("bars", "discount to the " + fmt.usd(c.top) + " high — taller is cheaper") +
+      tipRow("bars", "discount to the highest bar, " + fmt.usd(c.top) + " — taller is cheaper") +
       "<div class='tip-mute'>Flats are as quoted — CFR " + GD.esc(c.quote.port) +
       ", nothing reconstructed.</div>");
     return noWrapValue(st);
@@ -555,7 +584,10 @@
     var chipTone = r.tone === "bad" ? "bad" : r.tone === "warn" ? "warn" : r.tone === "accent" ? "accent" : "info";
 
     var money = el("div", {
-      style: { flex: "none", "text-align": "right", "min-width": "104px", "align-self": "center" }
+      style: {
+        flex: "none", "text-align": "right", "min-width": "104px", "align-self": "center",
+        cursor: r.tip ? "help" : "default"
+      }
     }, [
       el("div", {
         class: "num",
@@ -577,24 +609,40 @@
     action.setAttribute("aria-label", r.cta + ": " + r.statement);
 
     return el("div", { class: "note-row" }, [
-      el("span", { class: "stat-ico", style: tinted(r.tone) }, [icon(r.ico, 14, 1.9)]),
+      el("span", { class: "stat-ico", style: tinted(r.tone) }, [icon(r.ico, 14, 1.75)]),
       el("div", { class: "nr-body" }, [
         el("div", { class: "nr-head" }, [
           chip(r.sev, chipTone),
           chip(ag.name, "outline", ag.icon)
         ]),
         el("h4", { text: r.statement }),
-        el("div", { class: "nr-meta", text: r.detail })
+        /* Three or four lines of prose in a div, so the sheet's `p { text-wrap:
+           pretty }` never reaches it and the last line can orphan a word. */
+        el("div", { class: "nr-meta", style: { "text-wrap": "pretty" }, text: r.detail })
       ]),
       money,
       action
     ]);
   }
 
-  function needsCard() {
-    var rows = needsRows();
-    var host = el("div");
+  /* Counted once and shared with the agent cards below, so the two never
+     disagree about how many things are waiting on the same agent. */
+  function countByAgent(rows) {
+    var counts = {};
+    rows.forEach(function (r) { counts[r.agent] = (counts[r.agent] || 0) + 1; });
+    return counts;
+  }
 
+  function needsCard(rows) {
+    if (!rows.length) {
+      return GD.card({
+        title: "Needs you · 0",
+        sub: "Nothing in the data is asking for a decision this morning.",
+        body: [el("div", { class: "empty" }, [icon("check", 20, 1.5), el("div", { text: "The desk is clear." })])]
+      });
+    }
+
+    var host = el("div");
     function draw(which) {
       GD.clear(host);
       var list = which === "all" ? rows : rows.filter(function (r) { return r.agent === which; });
@@ -608,8 +656,7 @@
     }
     draw("all");
 
-    var counts = {};
-    rows.forEach(function (r) { counts[r.agent] = (counts[r.agent] || 0) + 1; });
+    var counts = countByAgent(rows);
     var items = [{ key: "all", label: "All " + fmt.n(rows.length, 0) }];
     ["buyer", "watch", "clerk"].forEach(function (k) {
       if (counts[k]) {
@@ -617,18 +664,10 @@
       }
     });
 
-    if (!rows.length) {
-      return GD.card({
-        title: "Needs you · 0",
-        sub: "Nothing in the data is asking for a decision this morning.",
-        body: [el("div", { class: "empty" }, [icon("check", 22, 1.6), el("div", { text: "The desk is clear." })])]
-      });
-    }
-
     return GD.card({
       title: "Needs you · " + fmt.n(rows.length, 0),
       sub: "Ordered by the money at stake. Every figure is labelled — an exposure is not a cost.",
-      actions: [items.length > 1 ? GD.seg(items, "all", draw) : null],
+      actions: items.length > 1 ? [GD.seg(items, "all", draw)] : null,
       flush: true,
       body: [host],
       foot: [
@@ -680,7 +719,11 @@
           text: perT(s)
         }),
         el("div", { class: "label", style: { "margin-top": "1px" }, text: "desk view" }),
-        el("div", { class: "nr-meta", style: { "margin-top": "3px" }, text: fmt.signedMoney(s * CARGO_MT) + " a cargo" })
+        el("div", {
+          class: "nr-meta",
+          style: { "margin-top": "3px", "font-variant-numeric": "tabular-nums" },
+          text: fmt.signedMoney(s * CARGO_MT) + " a cargo"
+        })
       ])
     ]);
   }
@@ -698,8 +741,13 @@
     var net = 0;
     five.forEach(function (n) { net += signedOf(n); });
 
-    var netChip = el("span", { class: "chip " + (net < 0 ? "chip-good" : net > 0 ? "chip-bad" : "") }, [
-      icon(net < 0 ? "down" : "up", 11, 2),
+    /* No arrow on a flat net: an up-arrow on a neutral chip claims a direction
+       the five notes did not add up to. */
+    var netChip = el("span", {
+      class: "chip " + (net < 0 ? "chip-good" : net > 0 ? "chip-bad" : ""),
+      style: { cursor: "help" }
+    }, [
+      net === 0 ? null : icon(net < 0 ? "down" : "up", 11, 2),
       el("span", { text: "net " + perT(net) })
     ]);
     GD.tipOn(netChip, "<b>The five notes, added up</b>" +
@@ -712,7 +760,7 @@
 
     return GD.card({
       title: "What changed overnight",
-      sub: fmt.n(five.length, 0) + " of " + plural(all.length, "note", "notes") +
+      sub: fmt.n(five.length, 0) + " of the " + plural(all.length, "note", "notes") +
         " The Watch has logged, newest first",
       actions: [netChip],
       flush: true,
@@ -775,7 +823,8 @@
   function stateChip(st) {
     if (st.state === "attention") {
       return el("span", { class: "chip chip-warn", style: { flex: "none" } }, [
-        icon("alert", 11, 2), el("span", { text: fmt.n(st.n, 0) + " need you" })
+        icon("alert", 11, 2),
+        el("span", { text: fmt.n(st.n, 0) + (st.n === 1 ? " needs you" : " need you") })
       ]);
     }
     if (st.state === "working") {
@@ -788,22 +837,34 @@
     ]);
   }
 
-  function agentStack() {
+  function agentStack(rows) {
     var list = (GD.AGENTS && GD.AGENTS.length) ? GD.AGENTS : FALLBACK_AGENTS;
     var stateOf = typeof GD.agentState === "function" ? GD.agentState : null;
+    var counts = countByAgent(rows);
     var box = el("div", { class: "grid", style: { "align-content": "start" } });
 
     list.forEach(function (a) {
-      var st = null;
-      if (stateOf) { try { st = stateOf(a); } catch (e) { st = null; } }
-      if (!st) st = { state: "idle", n: 0 };
+      /* The count comes from the rows the card above is listing, not from
+         GD.agentState: the rail counts a narrower set (it ignores the recovered
+         indication and the resting order), and two different numbers for the
+         same agent on the same screen is a contradiction, not a nuance.
+         agentState is still what tells Running from Idle when nothing waits. */
+      var n = counts[a.key] || 0;
+      var base = null;
+      if (stateOf) { try { base = stateOf(a); } catch (e) { base = null; } }
+      var st = {
+        n: n,
+        state: n ? "attention" : (base && base.state === "working" ? "working" : "idle")
+      };
       var today = agentToday(a.key);
       var card = GD.stat({
         label: a.question || "",
         value: a.name,
         icon: a.icon || "sparkle",
         aside: stateChip(st),
-        delta: [wrapRow([icon(today.icon, 12, 1.75), el("span", { text: today.text })])],
+        /* Stroke 1.5: the sentence beside it is regular weight, unlike the
+           other tiles where the glyph leads a bold figure. */
+        delta: [wrapRow([icon(today.icon, 12, 1.5), el("span", { text: today.text })])],
         onClick: function () { GD.go(a.route || "brief"); }
       });
       GD.tipOn(card, "<b>" + GD.esc(a.name) + "</b><div class='tip-mute'>" +
@@ -830,8 +891,9 @@
             flex: "none", "margin-top": "2px",
             color: tone === "accent" ? "var(--accent)" : "var(--ink-4)"
           }
-        }, [icon(ico, 12, 2)]),
-        el("span", { text: s })
+          /* Regular-weight line, so the marker is a 1.5 stroke. */
+        }, [icon(ico, 12, 1.5)]),
+        el("span", { style: { "text-wrap": "pretty" }, text: s })
       ]);
     }));
   }
@@ -877,7 +939,7 @@
       ],
       foot: [
         icon("eye", 13, 1.5),
-        el("span", { style: { flex: "1", "min-width": "240px" }, text: honesty }),
+        el("span", { style: { flex: "1", "min-width": "240px", "text-wrap": "pretty" }, text: honesty }),
         el("span", { class: "mono", style: { color: "var(--ink-4)" }, text: "built " + fmt.date(D.built) })
       ]
     });
@@ -896,10 +958,13 @@
     },
     badgeTone: "warn",
     render: function (wrap) {
+      /* Derived once per render and handed to both consumers: the card lists
+         them, the agent cards count them. */
+      var rows = needsRows();
       wrap.appendChild(pageHead());
       wrap.appendChild(statRow());
-      wrap.appendChild(needsCard());
-      wrap.appendChild(el("div", { class: "grid g-main" }, [overnightCard(), agentStack()]));
+      wrap.appendChild(needsCard(rows));
+      wrap.appendChild(el("div", { class: "grid g-main" }, [overnightCard(), agentStack(rows)]));
       wrap.appendChild(provenanceCard());
     }
   });

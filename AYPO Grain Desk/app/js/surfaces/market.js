@@ -18,6 +18,9 @@
   var D = window.DESK;
 
   var CARGO = D.profile.economics.cargo_mt;         /* 55,000 t */
+  /* Every class in the profile carries a `futures` key pointing at one of the three hedge
+     contracts, so the count is read off the data rather than written into a caption. */
+  var N_CLASSES = D.profile.classes.length;         /* 10 */
   var CHART_W = 1080, CHART_H = 268;
 
   /* Categorical, and deliberately neither emerald nor coral. */
@@ -94,6 +97,13 @@
   /* c/bu -> $/t, using the ratio the dataset already states rather than a constant. */
   function tonneFactor(ins) { return ins.usd_mt ? ins.usd_mt / ins.last : null; }
 
+  /* fmt has `signed` and `usd` but no signed-currency, and a net that reads "−2.40" beside
+     a pull that reads "$2.40/t" invites the reader to take it for a tonnage. */
+  function signedUsd(v, dp) {
+    if (v === null || v === undefined || isNaN(v)) return "—";
+    return (v > 0 ? "+" : v < 0 ? "−" : "") + fmt.usd(Math.abs(v), dp === undefined ? 2 : dp);
+  }
+
   function stanceLabel(net) { return net < 0 ? "Bearish" : net > 0 ? "Bullish" : "Balanced"; }
   function stanceTone(net) { return net < 0 ? "good" : net > 0 ? "bad" : ""; }
   function stanceIcon(net) { return net < 0 ? "down" : net > 0 ? "up" : "sort"; }
@@ -139,7 +149,7 @@
     var cards = [];        /* {ins, node, chip} — the instrument tiles */
     var flowBtns = [];     /* {key, node} — the causal-model nodes */
     var chartCard, chartHost, togglesHost, legendHost, rangeHost;
-    var feedCard, feedHost, filterHost, countHost;
+    var feedCard, feedHost, filterHost, countHost, stanceSeg;
     var boardTable, boardRows, boardMax;
 
     /* ------------------------------------------------------------ 1. head */
@@ -206,10 +216,13 @@
         aside: bars,
         delta: [
           dot(dotTone(ins.change)),
-          el("b", { class: GD.toneFor(ins.change), text: fmt.signed(ins.change, dp) }),
-          el("span", { class: GD.toneFor(ins.change), text: fmt.signedPct(ins.change_pct / 100) }),
+          el("b", { class: "num " + GD.toneFor(ins.change), text: fmt.signed(ins.change, dp) }),
+          el("span", { class: "num " + GD.toneFor(ins.change), text: fmt.signedPct(ins.change_pct / 100) }),
           sep(),
-          el("span", { text: ins.usd_mt ? fmt.usd(ins.usd_mt) + "/t" : ins.venue }),
+          el("span", {
+            class: ins.usd_mt ? "num" : null,
+            text: ins.usd_mt ? fmt.usd(ins.usd_mt) + "/t" : ins.venue
+          }),
           spacer(),
           mark
         ],
@@ -239,7 +252,7 @@
 
     wrap.appendChild(instrumentSection(
       "Hedge instruments",
-      "The three contracts the five wheat classes price against. Every line here is a cost to the mill, so a fall is emerald.",
+      "The three contracts every one of the " + N_CLASSES + " wheat classes prices against. Every line here is a cost to the mill, so a fall is emerald.",
       byRole(true)
     ));
     wrap.appendChild(instrumentSection(
@@ -298,6 +311,9 @@
       mark.style.setProperty("color", on ? "var(--accent)" : "var(--ink-4)");
       var b = el("button", {
         class: "btn btn-sm", type: "button", "aria-pressed": String(on),
+        /* The visible label is the bare ticker; the accessible name keeps it and adds the
+           contract, so the control is identifiable without reading the chart legend. */
+        "aria-label": ins.key + " · " + ins.label,
         onclick: function () { state.shown[ins.key] = !on; state.single = null; drawChart(); }
       }, [
         swatch,
@@ -384,9 +400,9 @@
           el("div", { class: "k", text: i.key + " · " + n + "-day range" }),
           el("div", { class: "v", text: fmt.n(r.lo, dpi) + " – " + fmt.n(r.hi, dpi) }),
           el("div", { class: "card-sub" }, [
-            el("span", { text: "last " + fmt.n(i.last, dpi) + " · " }),
+            el("span", { class: "num", text: "last " + fmt.n(i.last, dpi) + " · " }),
             el("span", {
-              class: GD.toneFor(whereInRange(i.last, r.lo, r.hi) - 0.5),
+              class: "num " + GD.toneFor(whereInRange(i.last, r.lo, r.hi) - 0.5),
               text: rangeWords(whereInRange(i.last, r.lo, r.hi))
             })
           ])
@@ -447,12 +463,15 @@
       "font-weight": "500", "text-align": "left"
     };
 
-    function nodeKids(st) {
+    /* `mark` is the "Filtering" chip, hidden until the node is the active filter: the
+       selected state must not be the accent tint alone. */
+    function nodeKids(st, mark) {
       var meta;
       if (st.n) {
         meta = el("div", { style: { display: "flex", "align-items": "center", gap: "5px", "flex-wrap": "wrap" } }, [
           chip(st.n === 1 ? "1 note" : st.n + " notes", "outline"),
-          chip(stanceLabel(st.net), stanceTone(st.net), stanceIcon(st.net))
+          chip(stanceLabel(st.net), stanceTone(st.net), stanceIcon(st.net)),
+          mark || null
         ]);
       } else {
         meta = el("div", { style: { "font-size": "var(--t-xs)", color: "var(--ink-4)" }, text: "no notes" });
@@ -479,19 +498,21 @@
           }
         }, nodeKids(st));
       }
+      var mark = chip("Filtering", "accent", "filter");
+      mark.style.setProperty("display", "none");
       var b = el("button", {
         class: "btn", type: "button", style: NODE_STYLE,
         "aria-pressed": String(state.driver === key),
         onclick: function () { setDriver(state.driver === key ? null : key); }
-      }, nodeKids(st));
+      }, nodeKids(st, mark));
       GD.tipOn(b, "<b>" + GD.esc(st.label) + "</b>" +
         tipRow("feeds", driver(key).feeds === "price" ? "price, directly" : driver(driver(key).feeds).label) +
         tipRow("notes", String(st.n)) +
         tipRow("bearish pull", fmt.usd(st.bear, 2) + "/t") +
         tipRow("bullish pull", fmt.usd(st.bull, 2) + "/t") +
-        tipRow("net", fmt.signed(st.net, 2) + "/t") +
+        tipRow("net", signedUsd(st.net, 2) + "/t") +
         "<div class='tip-mute' style='margin-top:5px'>Click to filter the intel feed.</div>");
-      flowBtns.push({ key: key, node: b });
+      flowBtns.push({ key: key, node: b, mark: mark });
       return b;
     }
 
@@ -597,7 +618,7 @@
         style: { display: "flex", "align-items": "center", width: "196px", "max-width": "100%" },
         role: "img",
         "aria-label": r.label + ": bearish pull " + fmt.usd(r.bear, 2) + " a tonne, bullish pull " +
-          fmt.usd(r.bull, 2) + " a tonne, net " + fmt.signed(r.net, 2)
+          fmt.usd(r.bull, 2) + " a tonne, net " + signedUsd(r.net, 2) + " a tonne"
       }, [
         el("div", {
           style: {
@@ -630,11 +651,17 @@
       GD.tipOn(host, "<b>" + GD.esc(r.label) + "</b>" +
         tipRow("bearish pull", fmt.usd(r.bear, 2) + "/t") +
         tipRow("bullish pull", fmt.usd(r.bull, 2) + "/t") +
-        tipRow("net", fmt.signed(r.net, 2) + "/t") +
+        tipRow("net", signedUsd(r.net, 2) + "/t") +
         tipRow("on a cargo", fmt.signedMoney(r.net * CARGO)));
       return host;
     }
 
+    /* The selected row carries only `is-selected` — the app-wide treatment. A funnel glyph
+       in this cell was tried and dropped: the Driver column is already at its min-content
+       width, so reserving 19px for it pushed the card 2px past the surface, and `.content`
+       clips rather than scrolls. The active driver is named in three places that cost no
+       width — the header's "Clear the …" pill, the count line, and the flow node's
+       "Filtering" chip — so the row itself is not the only carrier. */
     boardTable = GD.table({
       cols: [
         { key: "label", label: "Driver", tdClass: "strong", width: "168px" },
@@ -750,7 +777,7 @@
           el("div", { text: "No note matches both filters." }),
           el("button", {
             class: "btn btn-sm", type: "button",
-            onclick: function () { state.stance = "all"; setDriver(null); }
+            onclick: function () { clearFilters(); }
           }, [icon("x", 12, 2), "Clear the filters"])
         ]));
       } else {
@@ -758,6 +785,9 @@
       }
 
       GD.clear(filterHost);
+      /* An empty flex box still eats one of the header's gaps, so it leaves the flow
+         entirely when there is nothing to clear. */
+      filterHost.style.setProperty("display", state.driver ? "flex" : "none");
       if (state.driver) {
         var label = DS[state.driver] ? DS[state.driver].label : state.driver;
         filterHost.appendChild(el("button", {
@@ -767,12 +797,12 @@
         }, [icon("filter", 12, 2), label, icon("x", 12, 2)]));
       }
 
-      GD.clear(countHost);
-      countHost.appendChild(el("span", {
-        text: "Showing " + list.length + " of " + D.intel.length + " notes" +
-          (state.driver && DS[state.driver] ? " · " + DS[state.driver].label + " only" : "") +
-          (state.stance === "all" ? "" : " · " + state.stance)
-      }));
+      /* One live node whose text is replaced, not a fresh node each pass: an aria-live
+         region that is torn down and rebuilt re-announces even when nothing changed. */
+      var count = "Showing " + list.length + " of " + D.intel.length + " notes" +
+        (state.driver && DS[state.driver] ? " · " + DS[state.driver].label + " only" : "") +
+        (state.stance === "all" ? "" : " · " + state.stance);
+      if (countHost.textContent !== count) countHost.textContent = count;
     }
 
     function setDriver(key) {
@@ -780,6 +810,7 @@
       flowBtns.forEach(function (f) {
         var on = f.key === key;
         f.node.setAttribute("aria-pressed", String(on));
+        f.mark.style.setProperty("display", on ? "inline-flex" : "none");
         f.node.style.setProperty("background-color", on ? "var(--accent-soft)" : "");
         f.node.style.setProperty("border-color", on ? "var(--accent-line)" : "");
       });
@@ -788,23 +819,35 @@
       if (key) reveal(feedCard);
     }
 
+    /* Clearing from the empty state has to put the segmented control back as well, or its
+       aria-pressed goes on claiming "Bearish" while every note is on screen. */
+    function clearFilters() {
+      state.stance = "all";
+      GD.qsa("button", stanceSeg).forEach(function (b, i) {
+        b.setAttribute("aria-pressed", String(i === 0));
+      });
+      setDriver(null);          /* redraws the feed once */
+    }
+
     filterHost = el("div", { style: { display: "flex", "align-items": "center", gap: "7px" } });
     feedHost = el("div");
-    countHost = el("span");
+    countHost = el("span", {
+      "aria-live": "polite",
+      style: { "font-variant-numeric": "tabular-nums" }
+    });
 
     var bearN = D.intel.filter(function (n) { return n.stance === "bearish"; }).length;
+
+    stanceSeg = GD.seg([
+      { key: "all", label: "All · " + D.intel.length },
+      { key: "bearish", label: "Bearish · " + bearN },
+      { key: "bullish", label: "Bullish · " + (D.intel.length - bearN) }
+    ], "all", function (k) { state.stance = k; drawFeed(); });
 
     feedCard = GD.card({
       title: "Intel feed",
       sub: "Every note hangs off one of Pavin's levers, newest first.",
-      actions: [
-        filterHost,
-        GD.seg([
-          { key: "all", label: "All · " + D.intel.length },
-          { key: "bearish", label: "Bearish · " + bearN },
-          { key: "bullish", label: "Bullish · " + (D.intel.length - bearN) }
-        ], "all", function (k) { state.stance = k; drawFeed(); })
-      ],
+      actions: [filterHost, stanceSeg],
       flush: true,
       body: [feedHost],
       foot: [
@@ -836,7 +879,7 @@
     var wasdeBody = [];
 
     wasdeBody.push(el("div", { class: "statline" }, [
-      clockCell("Next release", days === null ? "—" : "in " + days + " days", "",
+      clockCell("Next release", days === null ? "—" : "in " + fmt.n(days, 0) + " days", "",
         next ? fmt.date(next.date) + ", Washington" : "nothing scheduled"),
       clockCell("Lands in Bangkok", next ? fmt.time(next.local) : "—", "",
         next ? fmt.date(next.local) + (next.dst ? " · US DST in force" : " · US DST over") : ""),
@@ -896,12 +939,13 @@
         icon("clock", 14, 1.75),
         el("span", {
           text: next
-            ? "Next: " + fmt.date(next.local) + " at " + fmt.time(next.local) + " Bangkok, in " + days + " days."
+            ? "Next: " + fmt.date(next.local) + " at " + fmt.time(next.local) +
+              " Bangkok, in " + fmt.n(days, 0) + " days."
             : "No release scheduled."
         })
       ]),
       after ? chip("Then " + fmt.dateShort(after.date) + ", in " +
-        fmt.daysBetween(D.built, after.date) + " days", "outline", "calendar") : null
+        fmt.n(fmt.daysBetween(D.built, after.date), 0) + " days", "outline", "calendar") : null
     ]));
 
     wrap.appendChild(GD.card({

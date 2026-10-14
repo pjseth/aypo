@@ -21,14 +21,17 @@
   var WHEAT_SHARE = D.profile.economics.wheat_share_of_cost;
   var QUARTERS = ["Q3'26", "Q4'26", "Q1'27", "Q2'27"];
   var AVG_KEY = "__avg";
+  var SEQ = 0;   /* bumped per render, so form ids stay unique across renders */
 
   /* ------------------------------------------------------------ palette
-     A small fixed palette, assigned once: the seven wheat classes in the
-     blend book are ordered by protein and cycled through five hues, so a
-     class keeps the same colour on every grade block and no single mix ever
-     shows two segments the same colour. Emerald is deliberately absent — on
-     this desk emerald means "cheaper to buy", and a colour that carries a
-     verdict must not also be a category label. */
+     A small fixed palette, assigned once: the wheat classes in the blend book
+     are ordered by protein and cycled through the four category hues, so a
+     class keeps the same colour on every grade block. Seven classes over four
+     hues means two distant classes share one, but no recipe in this book mixes
+     two classes four apart in the protein order, so no single mix shows two
+     segments the same colour. Emerald is deliberately absent — on this desk
+     emerald means "cheaper to buy", and a colour that carries a verdict must
+     not also be a category label. */
   var PALETTE = [
     "var(--c-margin)",   /* brick  — spring wheats, the protein end */
     "var(--c-futures)",  /* blue   */
@@ -105,13 +108,28 @@
 
   function shortName(grade) { return String(grade).split(" (")[0]; }
 
-  /* Signed baht, so "+฿2.28" reads as a move and not as a level. */
+  /* Signed money, so "+฿2.28" and "+$3.64" read as moves and not as levels.
+     fmt.thb/fmt.usd would put the sign inside the symbol ("$-3.64"). */
   function sthb(v, dp) {
     if (v === null || v === undefined || isNaN(v)) return "—";
-    return (v > 0 ? "+" : v < 0 ? "−" : "") + "฿" + fmt.n(Math.abs(v), dp === undefined ? 2 : dp);
+    return (v > 0 ? "+" : v < 0 ? "−" : "") + fmt.thb(Math.abs(v), dp);
+  }
+  function susd(v, dp) {
+    if (v === null || v === undefined || isNaN(v)) return "—";
+    return (v > 0 ? "+" : v < 0 ? "−" : "") + fmt.usd(Math.abs(v), dp);
   }
   function bahtAxis(v) { return fmt.thb(v, v % 1 === 0 ? 0 : 1); }
   function perKg(v) { return fmt.thb(v) + "/kg"; }
+
+  /* `.num` is a table-cell rule in app.css — `td.num, th.num`. A figure that
+     sits outside a table cell (and outside a `.kv` value, which has its own
+     rule) has to ask for the numerals by hand, and the contract says to do
+     that with an inline style rather than touching the shared sheet. */
+  function numStyle(extra) {
+    var s = { "font-variant-numeric": "tabular-nums" };
+    if (extra) Object.keys(extra).forEach(function (k) { s[k] = extra[k]; });
+    return s;
+  }
 
   /* ------------------------------------------------------------ blend fix
      For a grade that prices out under its protein minimum: how much of the
@@ -121,10 +139,15 @@
   function blendFix(g) {
     var calcP = sumBy(g.mix, function (m) { return m.share * m.protein; });
     var calcC = sumBy(g.mix, function (m) { return m.share * m.usd_mt; });
-    if (Math.abs(calcP - g.blend_protein) > 0.011) return { trusted: false };
+    /* "mix-disagrees" and "no-shortfall" are not failures of the fix, they are
+       the workbook disagreeing with itself. The caller says which it is rather
+       than printing a shortfall nobody can stand behind. */
+    if (Math.abs(calcP - g.blend_protein) > 0.011) {
+      return { reason: "mix-disagrees", calcP: calcP };
+    }
 
     var short = g.protein_min - calcP;
-    if (short <= 0) return { trusted: false };
+    if (short <= 0) return { reason: "no-shortfall", calcP: calcP };
 
     var hi = g.mix[0], lo = g.mix[0];
     g.mix.forEach(function (m) {
@@ -132,10 +155,10 @@
       if (m.protein < lo.protein) lo = m;
     });
     var span = hi.protein - lo.protein;
-    if (span <= 0) return { trusted: true, feasible: false, short: short, hi: hi, lo: lo };
+    if (span <= 0) return { reason: "one-protein", short: short, hi: hi, lo: lo };
 
     var x = short / span;
-    if (x > lo.share) return { trusted: true, feasible: false, short: short, hi: hi, lo: lo };
+    if (x > lo.share) return { reason: "too-far", short: short, hi: hi, lo: lo };
 
     var newCost = sumBy(g.mix, function (m) {
       return (m.share + (m === hi ? x : m === lo ? -x : 0)) * m.usd_mt;
@@ -146,7 +169,7 @@
     var mult = wheatThbKg > 0 ? g.flour_thb_kg / wheatThbKg : null;
     var dCost = newCost - calcC;
     return {
-      trusted: true, feasible: true,
+      reason: "ok",
       short: short, hi: hi, lo: lo, x: x,
       newHi: hi.share + x, newLo: lo.share - x,
       newCost: newCost, dCost: dCost,
@@ -174,7 +197,9 @@
   }
 
   function toned(text, v, positiveIsGood) {
-    return el("span", { class: "num " + GD.toneFor(v, positiveIsGood), text: text });
+    return el("span", {
+      class: "num " + GD.toneFor(v, positiveIsGood), text: text, style: numStyle()
+    });
   }
 
   function valueWithDelta(text, delta, positiveIsGood) {
@@ -195,8 +220,11 @@
       }
     }, [
       el("span", { style: { color: "var(--ink-4)", "flex": "none", "margin-top": "1px" } },
-        [icon("sparkle", 12, 1.6)]),
-      el("span", { text: text })
+        [icon("sparkle", 12, 1.5)]),
+      /* `text-wrap` inherits, so the sheet's `p { text-wrap: pretty }` already
+         reaches this span. Stated anyway so the prose keeps it if the flex
+         wrapper ever stops being a <p>. */
+      el("span", { style: { "text-wrap": "pretty" }, text: text })
     ]);
   }
 
@@ -226,7 +254,7 @@
         ? GD.chip("all meet spec", "good", "check")
         : GD.chip(FAILING.length + " below spec", "bad", "alert"),
       delta: [
-        icon("wheat", 13, 1.6),
+        icon("wheat", 13, 1.75),
         el("span", null, [
           el("b", { text: fmt.n(CLASS_COUNT) }),
           el("span", { text: " wheat classes in the blend book" })
@@ -280,7 +308,7 @@
         color: "var(--on-accent)", muted: "rgba(255, 255, 255, 0.30)"
       }),
       delta: [
-        icon("sort", 13, 1.6),
+        icon("sort", 13, 1.75),
         el("span", null, [
           el("span", { text: "thinnest " }),
           el("b", { text: fmt.pct(MARGIN_LO, 1) }),
@@ -323,7 +351,10 @@
 
     var body = [
       labelRow("Wheat cost build · $/t of blend",
-        el("span", { class: "num", style: { "font-weight": "600" }, text: fmt.usd(g.wheat_usd_mt) + "/t" })),
+        el("span", {
+          class: "num", style: numStyle({ "font-weight": "600" }),
+          text: fmt.usd(g.wheat_usd_mt) + "/t"
+        })),
       GD.compo(parts, g.wheat_usd_mt),
       el("div", { style: { "margin-top": "10px" } }, [
         GD.legend(g.mix.map(function (m) {
@@ -339,7 +370,7 @@
             : GD.chip(fmt.n(Math.abs(head), 2) + " pts short", "bad", "alert")
         ])],
         ["Protein minimum", fmt.n(g.protein_min, 2) + "%"],
-        ["Wheat cost", fmt.usd(g.wheat_usd_mt) + " /t"],
+        ["Wheat cost", fmt.usd(g.wheat_usd_mt) + "/t"],
         ["Flour cost", perKg(g.flour_thb_kg)]
       ])
     ];
@@ -356,7 +387,7 @@
         ])
       ];
 
-      if (fix.trusted && fix.feasible) {
+      if (fix.reason === "ok") {
         fixKids.push(el("p", { style: { "font-size": "var(--t-sm)", color: "var(--ink-2)" } },
           "This blend prices out " + fmt.n(fix.short, 2) + " protein points under the " +
           fmt.n(g.protein_min, 2) + "% minimum. Moving " + fmt.pct(fix.x, 1) +
@@ -371,11 +402,11 @@
             GD.chip("meets spec", "good", "check")
           ])],
           ["Wheat cost", el("span", { class: "flex items-center", style: { gap: "7px" } }, [
-            el("span", { text: fmt.usd(fix.newCost) + " /t" }),
-            el("span", { class: "num " + GD.toneFor(fix.dCost), text: (fix.dCost > 0 ? "+" : "") + fmt.usd(fix.dCost) })
+            el("span", { text: fmt.usd(fix.newCost) + "/t" }),
+            toned(susd(fix.dCost), fix.dCost)
           ])],
           fix.dThb === null ? null
-            : ["Flour cost effect", toned(sthb(fix.dThb) + " /kg", fix.dThb)]
+            : ["Flour cost effect", toned(sthb(fix.dThb) + "/kg", fix.dThb)]
         ]));
         if (fix.dThb !== null) {
           fixKids.push(reconstructed(
@@ -385,11 +416,31 @@
             "× wheat-to-flour cost multiple at ฿" + fmt.n(FX, 2) + "/USD."));
         }
       } else {
+        /* Each of these says exactly what is wrong. Saying "it cannot be closed
+           by a single swap" when the real problem is that the mix does not add
+           up to the stated blend protein would be a guess dressed as a finding. */
         fixKids.push(el("p", { style: { "font-size": "var(--t-sm)", color: "var(--ink-2)" } },
-          "This blend prices out " + fmt.n(Math.abs(head), 2) + " protein points under the " +
-          fmt.n(g.protein_min, 2) + "% minimum. Lifting the strongest class at the expense of the " +
-          "weakest is the obvious lever, but it cannot be closed by a single swap inside the stated " +
-          "mix — the shortfall is stated here rather than a precise fix invented."));
+          fix.reason === "mix-disagrees"
+            ? "The workbook marks this grade below its " + fmt.n(g.protein_min, 2) +
+              "% minimum, but its stated mix averages " + fmt.n(fix.calcP, 2) +
+              "% protein against a stated blend protein of " + fmt.n(g.blend_protein, 2) +
+              "%. The two do not agree, so no fix is derived from them here — the " +
+              "disagreement itself is the thing to take back to the blend sheet."
+            : fix.reason === "no-shortfall"
+            ? "The workbook marks this grade below its " + fmt.n(g.protein_min, 2) +
+              "% minimum, but its own mix averages " + fmt.n(fix.calcP, 2) +
+              "% protein, which clears it. The flag and the recipe disagree; that is " +
+              "reported rather than reconciled here."
+            : fix.reason === "one-protein"
+            ? "This blend prices out " + fmt.n(fix.short, 2) + " protein points under the " +
+              fmt.n(g.protein_min, 2) + "% minimum. Every class in the stated mix carries the " +
+              "same protein, so there is no stronger class to shift into — the shortfall needs " +
+              "a class this recipe does not contain."
+            : "This blend prices out " + fmt.n(fix.short, 2) + " protein points under the " +
+              fmt.n(g.protein_min, 2) + "% minimum. Lifting " + fix.hi.cls + " at the expense of " +
+              fix.lo.cls + " is the obvious lever, but closing the gap would take more " +
+              fix.lo.cls + " than the recipe has — the shortfall is stated here rather than a " +
+              "precise fix invented."));
       }
       body.push(el("div", { style: { "margin-top": "14px" } }, [panel("warn", fixKids)]));
     }
@@ -537,23 +588,34 @@
             { key: "baht_kg", label: "List ฿/kg", num: true, render: function (r) { return fmt.thb(r.baht_kg); } },
             { key: "cost_now", label: "Cost now", num: true, render: function (r) { return fmt.thb(r.cost_now); } },
             {
+              /* The dot beside the SKU is colour; the chip here is the label
+                 that goes with it, so "below cost" never rests on hue alone. */
               key: "margin", label: "Margin", num: true,
-              render: function (r) { return toned(fmt.pct(r.margin, 1), r.margin, true); }
+              render: function (r) {
+                return el("span", {
+                  class: "flex items-center",
+                  style: { gap: "7px", "justify-content": "flex-end" }
+                }, [
+                  r.margin < 0 ? GD.chip("below cost", "bad", "alert") : null,
+                  toned(fmt.pct(r.margin, 1), r.margin, true)
+                ]);
+              }
             },
             {
+              /* A required uplift is money off the mill's margin, so a positive
+                 number is the bad one — GD.toneFor's default sense. */
               key: "uplift", label: "Uplift to cost", num: true,
               sortValue: function (r) { return r.cost_now / r.baht_kg - 1; },
               render: function (r) {
                 var u = r.cost_now / r.baht_kg - 1;
-                return el("span", { class: "num " + (u > 0 ? "val-up" : "val-mute"), text: fmt.signedPct(u, 1) });
+                return toned(fmt.signedPct(u, 1), u);
               }
             },
             { key: "suggested", label: "Workbook suggested", num: true, render: function (r) { return fmt.thb(r.suggested); } }
           ],
           rows: rows,
           sortKey: "margin",
-          sortDir: "asc",
-          rowClass: function (r) { return r.margin < 0 ? "is-loss" : null; }
+          sortDir: "asc"
         });
 
         return [
@@ -642,7 +704,7 @@
         key: "incr_q1", label: "Increase", num: true,
         render: function (r) {
           return el("span", { class: "flex items-center", style: { gap: "6px", "justify-content": "flex-end" } }, [
-            el("span", { class: "num " + GD.toneFor(r.incr_q1), text: sthb(r.incr_q1) }),
+            toned(sthb(r.incr_q1), r.incr_q1),
             el("span", {
               style: { color: "var(--ink-3)", "font-size": "var(--t-xs)" },
               text: "(" + fmt.pct(r.incr_pct, 1) + ")"
@@ -661,7 +723,9 @@
       rows: FLOUR,
       sortKey: "margin",
       sortDir: "asc",
-      rowClass: function (r) { return r.margin < 0 ? "is-loss" : null; },
+      /* No rowClass: app.css styles `tbody tr.is-selected` and nothing else, so
+         a loss class would be a no-op. The loss state is carried in the SKU
+         cell's own left rail, its dot and the "below cost" chip instead. */
       onRow: function (r) { showSku(r, focusInChart); }
     });
 
@@ -699,7 +763,13 @@
     var bySku = {};
     FLOUR.forEach(function (f) { bySku[f.sku] = f; });
 
-    var select = el("select", { class: "field", id: "margin-sku-select", "aria-label": "Choose a SKU" }, [
+    /* The route re-renders on every navigation, and a surface can legitimately
+       be rendered into a second host (the probe does). A fixed id would collide
+       and leave `label[for]` pointing at two nodes, so it is unique per render.
+       No aria-label: the visible <label> below is the accessible name, and an
+       aria-label would override the text the user can actually see. */
+    var selectId = "margin-sku-" + (++SEQ);
+    var select = el("select", { class: "field", id: selectId }, [
       el("option", { value: AVG_KEY, text: "All " + FLOUR.length + " SKUs — average" })
     ].concat(FLOUR.map(function (f) {
       return el("option", { value: f.sku, text: f.sku + " · " + f.pack });
@@ -737,10 +807,7 @@
         [QUARTERS[3], valueWithDelta(perKg(series[3]), toQ2)],
         ["Four-quarter move", el("span", { class: "flex items-center", style: { gap: "7px" } }, [
           toned(sthb(toQ2), toQ2),
-          el("span", {
-            class: "num " + GD.toneFor(toQ2),
-            text: "(" + fmt.signedPct(series[0] ? series[3] / series[0] - 1 : 0, 1) + ")"
-          })
+          toned("(" + fmt.signedPct(series[0] ? series[3] / series[0] - 1 : 0, 1) + ")", toQ2)
         ])],
         f ? ["List price", perKg(f.baht_kg)] : null,
         f ? ["Margin", toned(fmt.pct(f.margin, 1), f.margin, true)] : null
@@ -762,12 +829,12 @@
       title: "Cost by quarter",
       sub: "Zero-based on purpose — a truncated baseline would exaggerate a few percent of carry.",
       actions: [
-        el("label", { class: "label", for: "margin-sku-select", text: "SKU" }),
+        el("label", { class: "label", for: selectId, text: "SKU" }),
         select
       ],
       body: [chartHost],
       foot: [
-        icon("file", 12, 1.6),
+        icon("file", 12, 1.5),
         el("span", { text: "Four-quarter cost line from the Q426 Industrial Margin Analysis workbook." })
       ]
     });
@@ -818,7 +885,7 @@
 
   function noteRow(ico, title, chipNode, text, meta) {
     return el("div", { class: "note-row" }, [
-      el("span", { style: { color: "var(--ink-4)", flex: "none", "margin-top": "2px" } }, [icon(ico, 16, 1.6)]),
+      el("span", { style: { color: "var(--ink-4)", flex: "none", "margin-top": "2px" } }, [icon(ico, 16, 1.75)]),
       el("div", { class: "nr-body" }, [
         el("div", { class: "nr-head" }, [
           el("h4", { text: title }),

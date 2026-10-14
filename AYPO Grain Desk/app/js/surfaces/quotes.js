@@ -670,7 +670,10 @@
     label: "Quote Board",
     icon: "quotes",
     group: "Trade",
+    /* A count of what arrived, not a count of what is wrong — accent, like the
+       other counting badges, and not the warn the two problem surfaces wear. */
     badge: function () { return D.quotes.length; },
+    badgeTone: "accent",
 
     render: function (wrap) {
       var all = D.quotes;
@@ -701,7 +704,7 @@
           GD.chip("as of " + fmt.date(D.built), "outline", "calendar"),
           el("button", {
             class: "btn", type: "button", onclick: showMethod
-          }, [icon("layers", 14, 1.6), "How the split is built"])
+          }, [icon("layers", 14, 1.75), "How the split is built"])
         ])
       ]));
 
@@ -743,8 +746,9 @@
         ],
         onClick: showMethod
       });
-      GD.tipOn(statItemised, "<b>Only two emails itemise</b><div class='tip-mute'>" +
-        "Open the method — the other " + (all.length - itemised.length) +
+      GD.tipOn(statItemised, "<b>" + GD.esc(fmt.n(itemised.length, 0)) + " of " +
+        GD.esc(fmt.n(all.length, 0)) + " emails itemise</b><div class='tip-mute'>" +
+        "Open the method — the other " + GD.esc(fmt.n(all.length - itemised.length, 0)) +
         " splits are rebuilt from the settlement curve and the freight market.</div>");
 
       var statCheapest = GD.stat({
@@ -756,8 +760,8 @@
         ]
       });
       GD.tipOn(statCheapest, "<b>Cheapest flat on the board</b><div class='tip-mute'>" +
-        "Lowest CFR price of the " + all.length + " indications. Wheat classes are not " +
-        "interchangeable — this is the cheapest tonne, not the cheapest grist.</div>");
+        "Lowest CFR price of the " + GD.esc(fmt.n(all.length, 0)) + " indications. Wheat classes " +
+        "are not interchangeable — this is the cheapest tonne, not the cheapest grist.</div>");
 
       wrap.appendChild(el("div", { class: "grid g-4" }, [
         statParsed, statSuppliers, statItemised, statCheapest
@@ -830,7 +834,7 @@
 
       /* ------------------------------------------------------- 4 · filters */
       var state = { origin: "all", cls: "all", supplier: "all", q: "" };
-      var table;   /* assigned below; the handlers only fire after that */
+      var table;   /* built below, before anything here can be clicked */
 
       function filtered() {
         var needle = state.q.trim().toLowerCase();
@@ -846,8 +850,16 @@
         });
       }
 
+      function countText(n) {
+        return "showing " + fmt.n(n, 0) + " of " + fmt.n(all.length, 0);
+      }
+
+      /* The live region starts populated rather than empty: a region that fills
+         itself a frame after the page renders announces a count nobody asked
+         for. After that it is only written when the string actually changes, so
+         it speaks when the number moves and stays quiet otherwise. */
       var countNode = el("span", {
-        "aria-live": "polite",
+        "aria-live": "polite", text: countText(all.length),
         style: {
           "font-size": "var(--t-xs)", color: "var(--ink-3)",
           "font-variant-numeric": "tabular-nums", "white-space": "nowrap"
@@ -859,14 +871,24 @@
         onclick: function () { clearAll(); }
       }, [icon("x", 12, 1.75), "Clear"]);
 
-      function apply() {
-        var rows = filtered();
-        if (table) table.update(rows);
-        countNode.textContent = "showing " + fmt.n(rows.length, 0) + " of " + fmt.n(all.length, 0);
+      /* The chrome around the table: how many rows are showing, and whether
+         there is anything to clear. */
+      function sync(n) {
+        var next = countText(n);
+        if (countNode.textContent !== next) countNode.textContent = next;
         var dirty = state.origin !== "all" || state.cls !== "all" ||
                     state.supplier !== "all" || state.q !== "";
         if (dirty) clearBtn.removeAttribute("disabled");
         else clearBtn.setAttribute("disabled", "");
+      }
+
+      /* Every filter change comes through here. The table is built with the full
+         set already, so the first paint syncs the chrome only — redrawing 26 rows
+         to arrive at the same 26 rows is work nobody sees. */
+      function apply() {
+        var rows = filtered();
+        table.update(rows);
+        sync(rows.length);
       }
 
       var originKeys = ["US", "AUS", "CA"].filter(function (code) {
@@ -937,7 +959,7 @@
             el("span", {
               class: "flex items-center gap-8",
               style: { color: "var(--ink-3)", flex: "none" }
-            }, [icon("filter", 14, 1.6), el("span", { class: "label", text: "Origin" })]),
+            }, [icon("filter", 14, 1.75), el("span", { class: "label", text: "Origin" })]),
             segNode,
             divider(),
             clsSel,
@@ -991,8 +1013,13 @@
         },
         {
           key: "vs_best", label: "vs best", num: true, width: "88px",
+          /* A zero here is not missing data: it means nothing cheaper was quoted
+             for that class in that window, so there is nothing to sit above. The
+             dash says that, and the card foot spells it out. */
           render: function (q) {
-            if (!q.vs_best) return el("span", { class: "val-mute", text: "—" });
+            if (q.vs_best === null || q.vs_best === undefined || q.vs_best === 0) {
+              return el("span", { class: "val-mute", text: "—" });
+            }
             return el("span", { class: GD.toneFor(q.vs_best), text: signedUsd(q.vs_best) });
           }
         },
@@ -1049,7 +1076,8 @@
         foot: [
           el("span", null, [
             el("b", { text: "vs best" }),
-            " is this indication against the cheapest one for the same class and the same shipment window."
+            " is this indication against the cheapest one for the same class and the same shipment " +
+            "window; a dash means nothing cheaper was quoted for that pairing."
           ]),
           el("span", { style: { color: "var(--ink-4)" }, text: "·" }),
           el("span", null, [
@@ -1065,7 +1093,7 @@
         ]
       }));
 
-      apply();
+      sync(all.length);
     }
   });
 
