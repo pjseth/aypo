@@ -202,55 +202,84 @@
     await wait(260);
   }
 
-  /* ================================================================ 2 · the wheat desk */
-
   /* ================================================================ 2 · the market */
 
   async function marketFlow() {
     GD.go("prices");
     await until(function () { return byText(".page-title", "Market"); }, "the market page");
     var ws = GD.ws();
+    function page() { return textOf(document.querySelector(".wrap")); }
 
-    var tiles = nodes(".wrap .grid.g-3 > button.card");
-    ok("there is a tile for every feed something is priced off", tiles.length >= 10,
-       tiles.length + " tiles");
-    var page = textOf(document.querySelector(".wrap"));
-    ok("the feeds name their source", page.indexOf("ICE Europe") >= 0);
-    ok("placeholder feeds are labelled on the tile", page.indexOf("mock") >= 0);
+    var rows = nodes(".wrap .pal-item");
+    ok("there is a watchlist row for every feed", rows.length >= 10, rows.length + " rows");
+    /* The watchlist rows carry the name and the reach; the source belongs on the instrument
+       header, where there is room for it. */
+    ok("the open instrument names its source", page().indexOf("BSP ref") >= 0);
+    ok("placeholder feeds are labelled", page().indexOf("mock") >= 0);
+    ok("the watchlist is grouped by kind",
+       page().indexOf("Commodities") >= 0 && page().indexOf("Freight") >= 0 &&
+       page().indexOf("FX") >= 0);
 
-    ok("the comparison chart drew", !!document.querySelector(".wrap svg.chart"));
-    ok("the chart says what it did to the units",
-       page.indexOf("indexed to 100") >= 0 || page.indexOf("Indexed to 100") >= 0);
+    ok("it opens on the feed that touches the most materials",
+       page().indexOf("USD / PHP spot") >= 0);
+    ok("the instrument chart drew", !!document.querySelector(".wrap svg.chart"));
+    ok("there is a window selector",
+       !!byText(".seg button", "6M") && !!byText(".seg button", "1Y"));
+    ok("the window stats are on screen",
+       page().indexOf("Window open") >= 0 && page().indexOf("12-month range") >= 0);
+    ok("the page says the daily path is generated",
+       page().indexOf("generated for this build") >= 0);
+    ok("it says what the feed is worth inside each material",
+       page().indexOf("inside each material") >= 0);
+
+    var opens = nodes(".wrap .statline > div").filter(function (d) {
+      return textOf(d).indexOf("Window open") >= 0;
+    })[0];
+    var before = textOf(opens);
+    var oneM = byText(".seg button", "1M");
+    ok("the window can be changed", !!oneM);
+    if (oneM) {
+      oneM.click();
+      await wait(300);
+      var after = textOf(nodes(".wrap .statline > div").filter(function (d) {
+        return textOf(d).indexOf("Window open") >= 0;
+      })[0]);
+      ok("a shorter window opens from a different level", after !== before,
+         before + " -> " + after);
+    }
+
+    var coffee = nodes(".wrap .pal-item").filter(function (r) {
+      return textOf(r).indexOf("Robusta") >= 0;
+    })[0];
+    ok("the watchlist has the coffee feed", !!coffee);
+    if (coffee) {
+      coffee.click();
+      await wait(320);
+      ok("picking a feed swaps the instrument",
+         page().indexOf("ICE Robusta coffee") >= 0);
+      ok("and swaps its source with it", page().indexOf("ICE Europe") >= 0);
+      ok("exactly one row is marked as selected",
+         nodes('.wrap .pal-item[data-active="true"]').length === 1,
+         nodes('.wrap .pal-item[data-active="true"]').length);
+    }
 
     ok("driver cost is reported for every material",
-       ws.materials.every(function (m) { return page.indexOf(m.name) >= 0; }));
+       ws.materials.every(function (m) { return page().indexOf(m.name) >= 0; }));
     ok("the bridge card is on the page",
-       page.indexOf("What that did to our materials") >= 0);
+       page().indexOf("What that did to our materials") >= 0);
 
-    /* A feed opens its own history and says what it prices. */
-    tiles[0].click();
-    var fs = await until(sheet, "the feed sheet");
-    var ft = textOf(fs);
-    ok("a feed opens its twelve months", !!fs.querySelector("svg.chart"));
-    ok("the feed sheet says what it prices", ft.indexOf("What it prices") >= 0);
-    ok("the feed sheet names its source and unit", ft.indexOf("12-month range") >= 0);
-    closeSheet();
-    await wait(260);
-
-    /* And the bridge hands a material to the price check. */
     var row = document.querySelector(".wrap .card tbody tr");
     ok("the material table is clickable", !!row);
     if (row) {
       row.click();
       await until(function () { return byText(".page-title", "Price check"); },
                   "the price check after the hand-off");
-      await wait(300);
-      var count = textOf(byText(".card", "showing"));
+      await wait(320);
       ok("the hand-off filtered the quote board to one material",
-         /showing \d+ of/.test(count) && GD.qs("select.field").value !== "all",
-         GD.qs("select.field").value);
+         GD.qs("select.field").value !== "all", GD.qs("select.field").value);
     }
   }
+
 
   async function spendFlow() {
     GD.go("spend");

@@ -7,7 +7,7 @@ Four screens, in the order the questions actually get asked:
 
 | | | |
 | --- | --- | --- |
-| **Market** | what are prices doing | every feed that sets the floor under a material, and what it did to that floor |
+| **Market** | what are prices doing | an instrument page per feed — watchlist, big chart, chosen window — and what each feed did to the floor under every material |
 | **Price check** | what should I be paying | a quote split into its published drivers and the premium the supplier is carrying, against the fair band and the budget |
 | **Spend** | what did I actually pay | the S/4HANA export cleaned in the browser, and the price paid per unit against budget |
 | **Bulletin** | what do I tell everyone | the fortnightly market bulletin, edited and approved before it can be exported |
@@ -28,6 +28,7 @@ start app/index.html          # or: open app/index.html
 # rebuild the dataset
 py -3.11 tools/build_ws.py               # materials, feeds, quotes, and the spend sample
 py -3.11 tools/build_data.py             # the wheat fixture the price model is checked against
+BARCHART_API_KEY=... py -3.11 tools/fetch_barchart.py   # real daily closes, optional
 
 # checks
 py -3.11 tools/jscheck.py --app          # every script parses and runs
@@ -159,23 +160,44 @@ thing that was approved is no longer the thing on screen.
 
 `app/index.html` opens on the Market screen. Four beats, about ten minutes:
 
-1. **Market.** Eleven feeds, each with its twelve months and how much of the book it touches —
-   USD/PHP alone sits under all eight materials. Below, the same twelve months indexed to 100
-   so mixed units can be compared, and then the bridge: what every feed did to the *driver
-   cost* of each material, which is the floor under a price and the part no supplier sets.
+1. **Market.** Opens on the feed with the widest reach, which on a book that imports most of
+   what it buys is USD/PHP — under all eight materials, and the chart shows the peso losing
+   11% over the year. Pick a window, scrub the chart and the big price follows the cursor
+   against where the window opened. Pick another feed from the watchlist. Then the part no
+   trading app has: what that feed is worth *inside* each material, and below it what every
+   feed did to each material's **driver cost** — the floor under a price, and the part no
+   supplier sets.
 2. **Price check.** The board opens on *Worth a call: Kalinga Highlands* — green coffee above
    the top of its fair band, with a premium that has widened four quarters running. Open the
    breakdown: published drivers, the FX conversion, the premium, and the line proving they add
    to the quoted price. Then **Negotiation brief**, and the table beneath it, which is every
    figure the brief is allowed to contain. Resin is the counter-example: inside the band and
    under budget.
-3. **Spend.** *Load the sample export* — 1,318 lines in a few milliseconds, most classified,
+3. **Spend.** *Load the sample export* — 1,319 lines in a few milliseconds, most classified,
    six duplicates, and the rest waiting on nine decisions. The first decision is one vendor
    spelling and clears seventy-odd lines at once. The report ties to the line items and says
    so on screen.
 4. **Bulletin.** *Generate draft* — nine sections, every figure sourced, and one that says it
    has no data rather than filling the gap. Edit a line, approve it, export it. Edit it again
    and the export closes.
+
+### Where the price data comes from
+
+The levels are monthly prints and the daily path between them is generated for this build —
+every chart that draws one says so, and the price model only ever reads the monthly prints,
+because a quote has to be argued against a published number on a stated date.
+
+`tools/fetch_barchart.py` swaps the generated paths for real daily closes from Barchart
+OnDemand. It runs at **build time**, not in the browser, for three independent reasons: a key
+in a static page is a published key; OnDemand sends no CORS header, so a browser request fails
+before the key matters; and the free tier is a couple of hundred calls a month against eleven
+feeds you would want daily. So it is pulled on the machine that runs the build and baked into
+`app/js/ws.js` like every other dataset here. Six of the eleven feeds have an exchange-traded
+equivalent and are mapped; the other five are assessed indices and private freight
+assessments with no public symbol, and keep their generated path and their label.
+
+It touches only the daily series. The monthly anchors are left alone, so turning real data on
+cannot quietly move a fair band.
 
 ### What the model does, and what it is not allowed to do
 

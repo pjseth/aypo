@@ -40,14 +40,23 @@ SCENARIOS = {
     "market-bottom": ("urc", "prices", """
         var h = document.querySelectorAll('.card-title');
         for (var i = 0; i < h.length; i++) {
-          if (h[i].textContent.indexOf('Twelve months') >= 0) {
+          if (h[i].textContent.indexOf('What that did') >= 0) {
             h[i].closest('.card').scrollIntoView({ block: 'start' }); break;
           }
         }
     """, 2600),
-    "market-feed": ("urc", "prices", """
-        document.querySelectorAll('.wrap .grid.g-3 > button.card')[0].click();
-    """, 3000),
+    "market-coffee": ("urc", "prices", """
+        var rows = document.querySelectorAll('.wrap .pal-item');
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i].textContent.indexOf('Robusta') >= 0) { rows[i].click(); break; }
+        }
+        setTimeout(function () {
+          var b = document.querySelectorAll('.seg button');
+          for (var i = 0; i < b.length; i++) {
+            if (b[i].textContent === '1Y') { b[i].click(); break; }
+          }
+        }, 500);
+    """, 3400),
     "pricecheck": ("urc", "pricecheck", "", 2000),
     "pricecheck-sheet": ("urc", "pricecheck", """
         var q = GD.pricing.latestPerSupplier('green_coffee', GD.ws().quotes)

@@ -262,12 +262,24 @@ FX is **not** a fourth addend — it is a named multiplier on each leg that need
 legs plus the premium equal the quote price by construction. `budget_price: null` is a real
 state and every screen handles it rather than printing a dash.
 
-The **Market** surface builds its feed list by walking the materials, so a feed is on screen
-exactly when something is priced off it and there is no second list to keep in step — plus the
-FX pair, which is nobody's driver and everybody's problem. Held-flat spreads are filtered out
-of the tiles and the chart (a flat line in a grid of things that move is a tile of nothing)
-and appear on the material rows instead. Every tick on the market strip is a feed something is
-priced off, so the strip and the screen cannot disagree.
+The **Market** surface is an instrument page: a watchlist of every feed, and one chart with a
+window (1M/3M/6M/1Y), a dashed line at the window's opening level, and a price that follows
+the cursor. It builds its feed list by walking the materials, so a feed is on screen exactly
+when something is priced off it and there is no second list to keep in step — plus the FX
+pair, which is nobody's driver and everybody's problem. Held-flat spreads are filtered out of
+the watchlist (a flat line has no window to choose and no range to sit in) and appear on the
+material rows instead. Every tick on the market strip is a feed something is priced off, so
+the strip and the screen cannot disagree.
+
+Each instrument carries a daily `history` and `dates` for display, and `synthetic_history`
+says whether that path is generated. The **price model never reads it** — `GD.pricing` reads
+the monthly `driver.dates` / `driver.values` prints, because a quote is argued against a
+published number on a stated date. `tools/fetch_barchart.py` replaces the daily path with real
+closes at build time and leaves the monthly anchors alone, so turning real data on cannot move
+a fair band.
+
+Colour on this screen is the app's convention and not a trading screen's: emerald is a falling
+price, because the cheaper tonne is the good outcome on a buying desk.
 
 ### `GD.pricing` — pure, no DOM, tested in `tools/lib_tests.js`
 
@@ -311,10 +323,17 @@ the pack and falls back if one is not traceable. The note says which path ran an
 generated documents) / `GD.printableFrame(title, html)` (the laid-out page, inspectable) /
 `GD.printDoc(title, html)` (that, plus the print dialogue) / `GD.editor(text, opts)`.
 
-### One addition to `core.js`
+### Additions to `core.js`
 
-`GD.chart.line` takes an optional `fmtX`. The default is right for a chart spanning weeks and
-wrong for one spanning a year, where "1 Oct" at both ends names two different Octobers.
+`GD.chart.line` takes four optional extras, all of them additive and all off by default:
+
+| Option | Does |
+| --- | --- |
+| `fmtX` | labels the x axis. The default is right for a chart spanning weeks and wrong for one spanning a year, where "1 Oct" at both ends names two different Octobers |
+| `area` | fills under the first series. First series only — more than one filled region is mud |
+| `baseline` | a dashed horizontal at a value, for "above or below where this window opened" |
+| `onHover(idx, date)` / `onLeave()` | the scrubbed point, for a caller drawing its own readout |
+| `tip: false` | suppresses the built-in tooltip, which a caller using `onHover` does not want twice |
 
 ## Checks
 
@@ -325,4 +344,5 @@ py -3.11 tools/test_app.py        # every route renders clean
 py -3.11 tools/test_flows.py      # the four flows, driven through the real DOM
 py -3.11 tools/shots.py           # screenshots of the states worth looking at
 py -3.11 tools/dump.py bulletin   # print a generated document, to read it
+py -3.11 tools/fetch_barchart.py --dry-run   # the feed-to-symbol mapping
 ```

@@ -210,13 +210,18 @@
   function buildStrip() {
     var strip = el("div", { class: "strip", role: "region", "aria-label": "Market" });
 
-    (GD.wsInstruments() || []).forEach(function (ins) {
+    /* Six ticks, not eleven. The strip is a glance; the market screen is the list. */
+    (GD.wsInstruments() || []).filter(function (ins) { return ins.strip; }).forEach(function (ins) {
       /* Decimals from the magnitude, not from a table of units to keep in step: a four-figure
          level reads better flat, a rate needs its places. */
       var dp = Math.abs(ins.last) >= 1000 ? 0 : 2;
       var val = fmt.n(ins.last, dp);
+      /* The month, not the day. These feeds are anchored on monthly prints, so a
+         day-over-day change is an artefact of the path drawn between two of them — it
+         printed as "+0.0%" across the whole strip, which is worse than saying nothing. */
+      var move = ins.month_ago ? (ins.last / ins.month_ago - 1) : 0;
       /* A rising input price costs the buyer money, so up is the bad tone here. */
-      var tone = GD.toneFor(ins.change);
+      var tone = GD.toneFor(move);
       var btn = el("button", {
         class: "tick", type: "button", onclick: function () { GD.go("prices"); }
       }, [
@@ -226,22 +231,23 @@
         el("span", { class: "tick-body" }, [
           el("span", { class: "tick-value" }, [
             el("span", { text: val }),
-            el("span", { class: "tick-delta " + tone, text: fmt.signedPct(ins.change_pct / 100) })
+            el("span", { class: "tick-delta " + tone, text: fmt.signedPct(move) })
           ]),
           el("span", { class: "tick-label", text: ins.key })
         ]),
         GD.chart.spark(ins.history, {
-          w: 54, h: 22, take: 45,
-          color: ins.change < 0 ? "var(--down)" : ins.change > 0 ? "var(--up)" : "var(--ink-4)"
+          w: 54, h: 22, take: 60,
+          color: move < 0 ? "var(--down)" : move > 0 ? "var(--up)" : "var(--ink-4)"
         })
       ]);
       GD.tipOn(btn, function () {
         return "<b>" + GD.esc(ins.label) + "</b>" +
           "<div class='tip-row'><span class='tip-mute'>last</span><b>" +
           GD.esc(val + " " + ins.unit) + "</b></div>" +
-          "<div class='tip-row'><span class='tip-mute'>vs month ago</span><b>" +
-          GD.esc(fmt.signedPct(ins.last / ins.month_ago - 1)) + "</b></div>" +
-          "<div class='tip-mute'>Open the market screen</div>";
+          "<div class='tip-row'><span class='tip-mute'>vs a month ago</span><b>" +
+          GD.esc(fmt.signedPct(move)) + "</b></div>" +
+          "<div class='tip-mute'>The figure on the tick is the month. Open the market " +
+          "screen for the window you want.</div>";
       });
       strip.appendChild(btn);
     });

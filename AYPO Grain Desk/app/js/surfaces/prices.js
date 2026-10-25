@@ -1,36 +1,45 @@
 /* Grain Desk — Market.
 
-   The feeds that set the floor under every material, and what they have done to it.
+   An instrument page, in the shape anyone who has opened a trading app already knows: a
+   watchlist down one side, and on the other a big chart with a price that follows the cursor
+   and a window you choose. That shape is not decoration — it is the fastest way to answer the
+   question a buyer asks the moment they are told a quote sits above its fair band, which is
+   "well, what has the underlying been doing?".
 
-   This is the one screen that is purely "what is the market doing", and it exists because
-   the rest of the desk kept implying an answer without ever showing it: the strip along the
-   top gives six levels and no history, and the bulletin reports moves inside a document you
-   have to generate. A buyer being told a quote sits above its fair band will immediately ask
-   what the underlying has been doing. This is where they look.
+   What is not borrowed from a trading app is the bottom of the page. An investor wants the
+   instrument; a buyer wants what the instrument did to the floor under their own materials,
+   in their own currency. That is the last block, and it is the one a generic market screen
+   cannot build.
 
-   Three blocks, in the order the question is actually asked:
+   One convention is deliberately *not* a trading screen's: emerald is a falling price and
+   coral a rising one, because this is a buying desk and the cheaper tonne is the good
+   outcome. The app has read that way since its first screen; flipping it here would be the
+   one place it lied.
 
-     1. every feed, its level and its twelve months          — what moved
-     2. one chart, indexed so mixed units can be compared    — what moved most
-     3. driver cost per material, month by month             — what that did to us
-
-   The third is the one a generic market screen cannot do: it is the market translated into
-   the floor under this company's own book, material by material, in its own currency. */
+   Where the numbers come from: the levels are the monthly prints the price model reads, and
+   the daily path between them is generated for this build. The page says so rather than
+   implying a tick feed. `tools/fetch_barchart.py` replaces the generated path with real
+   closes at build time for anyone with an OnDemand key. */
 (function () {
   "use strict";
 
   var el = GD.el, icon = GD.icon, fmt = GD.fmt, P = GD.pricing;
 
-  /* Categorical, and deliberately neither the emerald nor the coral that carry direction. */
-  var SERIES = [
-    "var(--c-futures)", "var(--c-freight)", "var(--c-margin)",
-    "var(--info)", "var(--c-residual)", "var(--accent-3)"
+  var WINDOWS = [
+    { key: "1M", label: "1M", days: 30, say: "past month" },
+    { key: "3M", label: "3M", days: 91, say: "past three months" },
+    { key: "6M", label: "6M", days: 182, say: "past six months" },
+    { key: "1Y", label: "1Y", days: 9999, say: "past twelve months" }
   ];
 
   function kindColor(kind) {
     return kind === "freight" ? "var(--c-freight)"
       : kind === "spread" ? "var(--c-basis)"
       : kind === "fx" ? "var(--c-margin)" : "var(--c-futures)";
+  }
+  function kindIcon(kind) {
+    return kind === "freight" ? "ship" : kind === "fx" ? "globe"
+      : kind === "spread" ? "layers" : "market";
   }
   function moves(f) { return f.kind !== "spread"; }
 
@@ -39,30 +48,34 @@
     if (style) Object.keys(style).forEach(function (k) { s[k] = style[k]; });
     return el("div", { class: "label", style: s, text: text });
   }
+  /* Decimals from the magnitude: a four-figure index reads flat, a rate needs its places. */
+  function num(v) {
+    if (v === null || v === undefined || isNaN(v)) return "—";
+    var a = Math.abs(v);
+    return fmt.n(v, a >= 1000 ? 0 : a >= 10 ? 2 : 4);
+  }
+  /* A twelve-month axis labelled "1 Oct ... 13 Oct" names two different Octobers. */
+  function axisDate(d) {
+    var m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return fmt.dateShort(d);
+    return fmt.months[Number(m[2]) - 1] + " '" + m[1].slice(2);
+  }
+  function statCell(k, v, tone) {
+    return el("div", null, [
+      el("div", { class: "k", text: k }),
+      el("div", { class: "v " + (tone || ""), text: v })
+    ]);
+  }
 
   /* ---------------------------------------------------------------- the feed list
 
-     A feed is whatever a material is priced off. The list is built by walking the materials,
-     so a feed is on this screen exactly when something is priced off it and there is no
-     second list to keep in step — plus the FX pair, which is nobody's driver and everybody's
-     problem.
+     Built by walking the materials, so a feed is on this screen exactly when something is
+     priced off it and there is no second list to keep in step. The daily path and the rest of
+     the instrument metadata are attached from the workspace's feed table.
 
      Held-flat spreads (a converter charge, a domestic premium) come back from here because
-     they are part of the cost build-up, but they are filtered out of the tiles and the chart:
-     a flat line in a grid of things that move is four tiles of nothing. They appear on the
-     material rows, where they belong. */
-
-  /* An instrument carries a daily path; a driver series is monthly. To put the two on one
-     chart the daily one is sampled at the monthly dates — the print in force on each. */
-  function monthlyFrom(ins, dates) {
-    return dates.map(function (d) {
-      var at = -1;
-      for (var i = 0; i < ins.dates.length; i++) {
-        if (ins.dates[i] <= d) at = i; else break;
-      }
-      return at < 0 ? ins.history[0] : ins.history[at];
-    });
-  }
+     they are part of the cost build-up, but they are not instruments: a flat line has no
+     window to choose and no range to sit in. They appear on the material rows instead. */
 
   function feeds(ws) {
     var byKey = {}, out = [];
@@ -73,7 +86,7 @@
           f = byKey[d.key] = {
             key: d.key, name: d.name, source: d.source, unit: d.unit,
             currency: d.currency, kind: d.kind, mocked: !!d.mocked, note: d.note,
-            dates: d.dates, values: d.values, materials: []
+            months: d.dates, monthly: d.values, materials: []
           };
           out.push(f);
         }
@@ -81,57 +94,47 @@
       });
     });
 
-    var monthDates = out.length ? out[0].dates : [];
-
     (GD.wsInstruments() || []).forEach(function (ins) {
       var f = byKey[ins.key];
-      if (f) {
-        /* The ones with a daily path get it, for the sparkline. */
-        f.instrument = ins;
-        f.daily = ins.history;
-        return;
+      if (!f) {
+        /* An FX pair is nobody's driver — it is the conversion applied to everyone else's —
+           so walking the materials never finds it. It is also the feed with the widest reach
+           on a book that imports most of what it buys. */
+        if (ins.role !== "fx") return;
+        f = byKey[ins.key] = {
+          key: ins.key, name: ins.label, source: ins.venue, unit: ins.unit,
+          currency: ins.currency, kind: "fx", mocked: true,
+          note: "Every leg published in another currency is converted at this rate.",
+          months: [], monthly: [],
+          materials: (ws.materials || []).filter(function (m) {
+            return (m.drivers || []).some(function (d) { return d.currency !== m.currency; });
+          })
+        };
+        out.push(f);
       }
-      /* An FX pair is nobody's driver — it is the conversion applied to everyone else's —
-         so it never appears by walking the materials. It is also the single feed with the
-         widest reach on a book that imports 60% of what it buys, and leaving it off the
-         market screen while it sits on the strip above would be absurd. */
-      if (ins.role !== "fx") return;
-      byKey[ins.key] = ins;
-      out.push({
-        key: ins.key, name: ins.label, source: ins.venue, unit: ins.unit,
-        currency: ins.currency, kind: "fx", mocked: true,
-        note: "Every leg published in another currency is converted at this rate. An " +
-              "indicative mid for this build, not a live feed.",
-        dates: monthDates,
-        values: monthlyFrom(ins, monthDates),
-        daily: ins.history,
-        instrument: ins,
-        materials: (ws.materials || []).filter(function (m) {
-          return (m.drivers || []).some(function (d) { return d.currency !== m.currency; });
-        })
-      });
+      f.values = ins.history;
+      f.dates = ins.dates;
+      f.last = ins.last;
+      f.strip = !!ins.strip;
+      f.synthetic = !!ins.synthetic_history;
     });
 
-    var asOf = GD.wsAsOf();
     out.forEach(function (f) {
-      /* The last point is "now" for every feed. For one with a daily path that is today's
-         level — the same number the strip shows, which it had better be. For a monthly one
-         it is the print still in force, which is exactly how the price model reads it. */
-      f.dates = f.dates.slice(0, -1).concat([asOf]);
-      if (f.instrument) {
-        f.values = f.values.slice(0, -1).concat([f.instrument.last]);
+      /* A spread has no instrument: its series is its own held constant. */
+      if (!f.values) {
+        f.values = f.monthly;
+        f.dates = f.months;
+        f.last = f.monthly[f.monthly.length - 1];
       }
       var v = f.values;
-      f.last = v[v.length - 1];
       f.first = v[0];
-      f.prevMonth = v.length > 1 ? v[v.length - 2] : null;
       f.year = f.first ? (f.last - f.first) / f.first : null;
-      f.month = f.prevMonth ? (f.last - f.prevMonth) / f.prevMonth : null;
       var sorted = v.slice().sort(function (a, b) { return a - b; });
       f.lo = sorted[0];
       f.hi = sorted[sorted.length - 1];
       f.where = (f.hi - f.lo) ? (f.last - f.lo) / (f.hi - f.lo) : 0.5;
     });
+
     var rank = { index: 0, fx: 1, freight: 2, spread: 3 };
     out.sort(function (a, b) {
       if (rank[a.kind] !== rank[b.kind]) return rank[a.kind] - rank[b.kind];
@@ -140,199 +143,316 @@
     return out;
   }
 
-  function level(f) {
-    return fmt.n(f.last, Math.abs(f.last) >= 1000 ? 0 : 2);
+  /* A window of a feed's daily path, and what it did across it. */
+  function slice(f, win) {
+    var n = f.values.length;
+    var take = Math.max(2, Math.min(n, win.days));
+    var values = f.values.slice(n - take);
+    var dates = f.dates.slice(n - take);
+    var open = values[0], last = values[values.length - 1];
+    var sorted = values.slice().sort(function (a, b) { return a - b; });
+    return {
+      values: values, dates: dates, open: open, last: last,
+      high: sorted[sorted.length - 1], low: sorted[0],
+      change: last - open,
+      pct: open ? (last - open) / open : null
+    };
   }
 
-  /* ------------------------------------------------------------------- 1 · the tiles */
+  /* ================================================================= the watchlist */
 
-  function feedTile(f, ws, onPick) {
-    /* Where in its own twelve-month range the feed is sitting: the question a buyer asks of
-       a level before they ask anything else. */
-    var rangeBar = el("div", {
+  function watchRow(f, selected, onPick) {
+    var row = el("button", {
+      class: "pal-item", type: "button",
+      "data-active": String(selected),
       style: {
-        position: "relative", height: "5px", "border-radius": "var(--r-pill)",
-        background: "var(--surface-3)", "margin-top": "2px"
-      }
-    }, [
-      el("div", {
-        style: {
-          position: "absolute", left: (f.where * 100).toFixed(1) + "%", top: "-2px",
-          width: "9px", height: "9px", "margin-left": "-4.5px", "border-radius": "50%",
-          background: f.year < 0 ? "var(--down)" : "var(--up)",
-          "box-shadow": "0 0 0 2px var(--surface)"
-        }
-      })
-    ]);
-
-    var node = el("button", {
-      class: "card is-hoverable", type: "button",
-      style: {
-        padding: "14px 15px", display: "grid", gap: "9px", "text-align": "left",
-        cursor: "pointer"
+        width: "100%", "text-align": "left", padding: "9px 11px", gap: "10px",
+        "border-radius": "var(--r-ctl)", "min-width": "0"
       },
       onclick: function () { onPick(f); }
     }, [
-      /* `min-width: 0` because the tile is a grid, and a grid item defaults to `min-width:
-         auto` — which means this flex row refuses to shrink below its content and a long
-         feed name pushes the mock chip straight out through the side of the card. */
-      el("div", {
-        class: "flex items-center gap-8",
-        style: { "align-items": "flex-start", "min-width": "0" }
-      }, [
+      el("span", {
+        style: {
+          width: "20px", height: "20px", "border-radius": "6px", flex: "none",
+          background: "var(--surface-3)", color: kindColor(f.kind),
+          display: "grid", "place-items": "center"
+        }
+      }, [icon(kindIcon(f.kind), 12, 1.75)]),
+      el("span", { style: { flex: "1", "min-width": "0", display: "grid", gap: "1px" } }, [
         el("span", {
           style: {
-            width: "22px", height: "22px", "border-radius": "7px", flex: "none",
-            background: "var(--surface-3)", color: kindColor(f.kind), display: "grid",
-            "place-items": "center"
-          }
-        }, [icon(f.kind === "freight" ? "ship" : f.kind === "fx" ? "globe" : "market",
-                 13, 1.75)]),
-        el("div", { style: { flex: "1", "min-width": "0" } }, [
-          el("div", {
-            style: {
-              "font-size": "var(--t-sm)", "font-weight": "600", "line-height": "1.3",
-              overflow: "hidden", "text-overflow": "ellipsis", "white-space": "nowrap"
-            },
-            text: f.name
-          }),
-          el("div", {
-            style: { "font-size": "var(--t-xs)", color: "var(--ink-3)" },
-            text: f.source + " · " + f.unit
-          })
-        ]),
-        f.mocked ? GD.chip("mock", "outline") : null
-      ]),
-      el("div", { class: "flex items-center gap-8", style: { "justify-content": "space-between" } }, [
-        el("div", { class: "num", style: { "font-size": "21px", "font-weight": "600",
-                                           "letter-spacing": "-0.02em" }, text: level(f) }),
-        GD.chart.spark(f.daily || f.values, {
-          w: 74, h: 26, take: (f.daily || f.values).length,
-          color: f.year < 0 ? "var(--down)" : "var(--up)"
+            "font-size": "var(--t-sm)", "font-weight": "600", display: "block",
+            overflow: "hidden", "text-overflow": "ellipsis", "white-space": "nowrap"
+          },
+          text: f.name
+        }),
+        el("span", {
+          style: { "font-size": "var(--t-xs)", color: "var(--ink-4)" },
+          text: f.materials.length + (f.materials.length === 1 ? " material" : " materials")
         })
       ]),
-      rangeBar,
-      el("div", {
-        class: "flex items-center gap-8",
-        style: {
-          "justify-content": "space-between", "font-size": "var(--t-xs)",
-          "flex-wrap": "wrap", "row-gap": "3px"
-        }
+      GD.chart.spark(f.values, {
+        w: 46, h: 20, take: f.values.length,
+        color: f.year < 0 ? "var(--down)" : "var(--up)", fill: false, endpoint: false
+      }),
+      el("span", {
+        style: { display: "grid", gap: "1px", "text-align": "right", flex: "none" }
       }, [
-        el("span", { class: GD.toneFor(f.month) + " nowrap",
-          text: fmt.signedPct(f.month, 1) + " 1m" }),
-        el("span", { class: GD.toneFor(f.year) + " nowrap",
-          text: fmt.signedPct(f.year, 1) + " 12m" }),
-        el("span", { class: "nowrap", style: { color: "var(--ink-4)" },
-          text: f.materials.length + (f.materials.length === 1 ? " material" : " materials") })
+        el("span", {
+          class: "num", style: { "font-size": "var(--t-sm)", "font-weight": "600" },
+          text: num(f.last)
+        }),
+        el("span", {
+          class: "num " + GD.toneFor(f.year),
+          style: { "font-size": "var(--t-xs)", "font-weight": "600" },
+          text: fmt.signedPct(f.year, 1)
+        })
+      ])
+    ]);
+    if (f.mocked) row.setAttribute("title", "Placeholder series for this build");
+    return row;
+  }
+
+  function watchlist(list, current, onPick) {
+    var groups = [
+      { key: "index", label: "Commodities" },
+      { key: "fx", label: "FX" },
+      { key: "freight", label: "Freight" }
+    ];
+    var body = el("div", {
+      style: { padding: "7px", "max-height": "620px", "overflow-y": "auto" }
+    });
+    groups.forEach(function (g) {
+      var picked = list.filter(function (f) { return f.kind === g.key; });
+      if (!picked.length) return;
+      body.appendChild(el("div", { class: "pal-group label", text: g.label }));
+      picked.forEach(function (f) {
+        body.appendChild(watchRow(f, f.key === current.key, onPick));
+      });
+    });
+    return GD.card({
+      title: "Feeds",
+      sub: list.length + " things this book is priced off",
+      flush: true,
+      body: [body],
+      foot: [
+        el("span", { style: { color: "var(--ink-3)" },
+          text: "Emerald is a falling price. This is a buying desk, so the colours run the " +
+                "opposite way to a trading screen: cheaper is the good outcome." })
+      ]
+    });
+  }
+
+  /* ============================================================== the instrument */
+
+  function instrumentCard(f, ws, state, onWindow) {
+    var win = WINDOWS.filter(function (w) { return w.key === state.window; })[0] || WINDOWS[2];
+    var s = slice(f, win);
+    var tone = s.change < 0 ? "var(--down)" : s.change > 0 ? "var(--up)" : "var(--ink-3)";
+
+    var bigPrice = el("div", {
+      class: "num",
+      style: {
+        "font-size": "34px", "font-weight": "600", "letter-spacing": "-0.03em",
+        "line-height": "1.05"
+      }
+    });
+    var changeLine = el("div", {
+      class: "num",
+      style: { "font-size": "var(--t-body)", "font-weight": "600", "margin-top": "3px" }
+    });
+    var whenLine = el("div", {
+      style: { "font-size": "var(--t-xs)", color: "var(--ink-3)", "margin-top": "1px" }
+    });
+
+    function paint(value, change, when) {
+      bigPrice.textContent = num(value);
+      changeLine.textContent = (change > 0 ? "+" : change < 0 ? "−" : "") +
+        num(Math.abs(change)) + "   " + fmt.signedPct(s.open ? change / s.open : 0, 2);
+      changeLine.style.setProperty("color",
+        change < 0 ? "var(--down)" : change > 0 ? "var(--up)" : "var(--ink-3)");
+      whenLine.textContent = when;
+    }
+    /* Scrubbing reads the point under the cursor against where the window opened — which is
+       exactly the comparison the dashed baseline on the chart is drawing. */
+    function showPoint(idx) {
+      paint(s.values[idx], s.values[idx] - s.open,
+        fmt.date(s.dates[idx]) + " · against " + num(s.open) + " on " + fmt.date(s.dates[0]));
+    }
+    function showLatest() {
+      paint(s.last, s.change, win.say + " · " + f.unit);
+    }
+    showLatest();
+
+    var chart = GD.chart.line({
+      series: [{ name: f.name, values: s.values, color: tone, weight: 2 }],
+      dates: s.dates,
+      w: 1000, h: 290,
+      area: true,
+      baseline: s.open,
+      tip: false,
+      onHover: showPoint,
+      onLeave: showLatest,
+      fmtY: num,
+      fmtX: win.days > 200 ? axisDate : fmt.dateShort,
+      label: f.name + ", " + win.say
+    });
+    chart.classList.add("chart-reveal");
+
+    var head = el("div", {
+      style: {
+        display: "flex", "align-items": "flex-start", "justify-content": "space-between",
+        gap: "16px", "flex-wrap": "wrap", "margin-bottom": "14px"
+      }
+    }, [
+      el("div", { style: { "min-width": "240px", flex: "1" } }, [
+        el("div", {
+          class: "flex items-center gap-8",
+          style: { "margin-bottom": "5px", "min-width": "0" }
+        }, [
+          el("span", {
+            style: {
+              width: "24px", height: "24px", "border-radius": "7px", flex: "none",
+              background: "var(--surface-3)", color: kindColor(f.kind),
+              display: "grid", "place-items": "center"
+            }
+          }, [icon(kindIcon(f.kind), 14, 1.75)]),
+          el("div", { class: "card-title", text: f.name }),
+          f.mocked ? GD.chip("mock", "outline") : null
+        ]),
+        /* Name the materials while they fit on one line; past that, count them and put the
+           list in the tooltip. Eight names wrapped to three lines and pushed the price,
+           which is the thing somebody came here to read, below the fold of the card. */
+        (function () {
+          var names = f.materials.map(function (m) { return m.name; });
+          var line = el("div", {
+            style: {
+              "font-size": "var(--t-xs)", color: "var(--ink-3)", "margin-bottom": "12px"
+            },
+            text: f.source + " · " + f.unit + (names.length
+              ? " · " + (f.kind === "fx" ? "converts " : "prices ") +
+                (names.length > 3 ? names.length + " materials" : names.join(", "))
+              : "")
+          });
+          if (names.length > 3) {
+            GD.tipOn(line, "<b>" + GD.esc(f.name) + "</b><div class='tip-mute'>" +
+              GD.esc(names.join(" · ")) + "</div>");
+          }
+          return line;
+        })(),
+        bigPrice, changeLine, whenLine
+      ]),
+      el("div", { style: { "margin-top": "2px", flex: "none" } }, [
+        GD.seg(WINDOWS.map(function (w) { return { key: w.key, label: w.label }; }),
+          win.key, onWindow)
       ])
     ]);
 
-    GD.tipOn(node, "<b>" + GD.esc(f.name) + "</b><div class='tip-mute'>" +
-      GD.esc(f.source) + (f.mocked ? " — placeholder series for this build" : "") +
-      "</div><div class='tip-row'><span class='tip-mute'>12-month range</span><b>" +
-      GD.esc(fmt.n(f.lo, f.lo >= 1000 ? 0 : 2) + " – " + fmt.n(f.hi, f.hi >= 1000 ? 0 : 2)) +
-      "</b></div><div class='tip-row'><span class='tip-mute'>prices</span><b>" +
-      GD.esc(f.materials.map(function (m) { return m.name; }).join(", ")) + "</b></div>");
-    return node;
-  }
-
-  /* ----------------------------------------------------------------- 2 · the chart
-
-     Robusta trades in USD a tonne, Brent in USD a barrel, sugar in cents a pound. They cannot
-     share an axis, so everything is indexed to 100 at the start of the window — which is how
-     a market report would put them side by side anyway, and it answers the only question
-     worth asking across feeds: which of these moved most. */
-
-  var GROUPS = [
-    { key: "raw", label: "Raw material drivers" },
-    { key: "pack", label: "Packaging drivers" },
-    { key: "logistics", label: "FX and freight" }
-  ];
-
-  function groupOf(f, ws) {
-    if (f.kind === "freight" || f.kind === "fx") return "logistics";
-    var anyRaw = f.materials.some(function (m) { return m.category === "raw"; });
-    return anyRaw ? "raw" : "pack";
-  }
-
-  /* A twelve-month axis labelled "1 Oct ... 13 Oct" names two different Octobers. */
-  function axisDate(d) {
-    var m = String(d).match(/^(\d{4})-(\d{2})/);
-    if (!m) return fmt.dateShort(d);
-    return fmt.months[Number(m[2]) - 1] + " '" + m[1].slice(2);
-  }
-
-  function indexed(values) {
-    var base = values[0];
-    if (!base) return values.map(function () { return 100; });
-    return values.map(function (v) { return P.round2((v / base) * 100); });
-  }
-
-  function chartCard(all, ws) {
-    var list = all.filter(moves);
-    var state = { group: "raw" };
-    var host = el("div");
-    var note = el("p", {
-      style: { "font-size": "var(--t-xs)", color: "var(--ink-3)", "margin-top": "9px" }
-    });
-
-    function draw() {
-      GD.clear(host);
-      var picked = list.filter(function (f) { return groupOf(f, ws) === state.group; });
-      if (!picked.length) {
-        host.appendChild(el("div", { class: "empty" }, [
-          icon("market", 20, 1.5),
-          el("div", { text: "No feeds in this group." })
-        ]));
-        note.textContent = "";
-        return;
+    var stats = el("div", {
+      class: "statline",
+      style: {
+        border: "1px solid var(--border)", "border-radius": "var(--r-ctl)",
+        overflow: "hidden", "margin-top": "16px"
       }
-      host.appendChild(GD.chart.line({
-        series: picked.map(function (f, i) {
-          return { name: f.name, values: indexed(f.values), color: SERIES[i % SERIES.length] };
-        }),
-        dates: picked[0].dates,
-        w: 1080, h: 250,
-        fmtY: function (v) { return fmt.n(v, 0); },
-        fmtTip: function (v) { return fmt.n(v, 1); },
-        fmtX: axisDate,
-        label: "Driver feeds, indexed to 100 twelve months ago"
-      }));
-      host.appendChild(GD.legend(picked.map(function (f, i) {
-        return {
-          name: f.name + " · " + fmt.signedPct(f.year, 1),
-          color: SERIES[i % SERIES.length]
-        };
-      })));
+    }, [
+      statCell("Window open", num(s.open)),
+      statCell("High", num(s.high)),
+      statCell("Low", num(s.low)),
+      /* Four cells, not five: a fifth wrapped onto its own row and read as an orphan. Where
+         the level sits in its twelve-month range belongs next to the range itself anyway. */
+      el("div", null, [
+        el("div", { class: "k", text: "12-month range" }),
+        el("div", { class: "v" }, num(f.lo) + " – " + num(f.hi)),
+        el("div", {
+          class: "num " + (f.where > 0.75 ? "val-up" : f.where < 0.25 ? "val-down" : ""),
+          style: { "font-size": "var(--t-xs)", "font-weight": "600" },
+          text: fmt.pct(f.where, 0) + " of the way up it"
+        })
+      ])
+    ]);
 
-      var moved = picked.slice().sort(function (a, b) {
-        return Math.abs(b.year) - Math.abs(a.year);
-      })[0];
-      note.textContent = "Each line starts at 100 twelve months ago, so the units do not have " +
-        "to agree. " + moved.name + " has moved furthest over the period, " +
-        fmt.signedPct(moved.year, 1) + ".";
-    }
-
-    var seg = GD.seg(GROUPS.map(function (g) {
-      var n = list.filter(function (f) { return groupOf(f, ws) === g.key; }).length;
-      return { key: g.key, label: g.label + " " + n };
-    }), "raw", function (k) { state.group = k; draw(); });
-
-    draw();
     return GD.card({
-      title: "Twelve months, side by side",
-      sub: "Indexed to 100 at the start, because the units do not compare",
-      actions: [seg],
-      body: [host, note]
+      body: [head, chart, stats, pricesBlock(f, ws)],
+      foot: [
+        el("span", { style: { color: "var(--ink-3)" },
+          text: f.synthetic
+            ? "The levels are the monthly prints the price model reads. The daily path " +
+              "between them is generated for this build, not a tick feed."
+            : "Daily closes from " + f.source + "." }),
+        el("span", { style: { flex: "1", "min-width": "0" } }),
+        el("span", { class: "nowrap", style: { color: "var(--ink-3)" },
+          text: "as of " + fmt.date(GD.wsAsOf()) })
+      ]
     });
   }
 
-  /* --------------------------------------------- 3 · what it did to our materials
+  /* What this feed is worth, per unit, inside each material it touches — the translation
+     step that turns an index into somebody's cost.
 
-     The bridge. Driver cost is the published floor under a material — the part of the price
-     that is not the supplier's to set — so its path over twelve months is the honest answer
-     to "has this got more expensive, and was it them or the market". */
+     An FX pair needs a different sum. It is not a leg on anything; it is the multiplier on
+     every leg published in another currency. So for FX the figure is the converted value of
+     those legs, which on an importer's book is most of the price. */
+  function worthIn(f, m, asOf) {
+    var cost = P.driverCost(m, asOf);
+    var value = null;
+    if (f.kind === "fx") {
+      var sum = 0, any = false;
+      P.legs(m, asOf).forEach(function (l) {
+        if (l.currency === m.currency || l.value === null) return;
+        sum += l.value;
+        any = true;
+      });
+      value = any ? P.round2(sum) : null;
+    } else {
+      P.legs(m, asOf).forEach(function (l) { if (l.key === f.key) value = l.value; });
+    }
+    return { value: value, share: (value !== null && cost) ? value / cost : null };
+  }
+
+  function pricesBlock(f, ws) {
+    if (!f.materials.length) return null;
+    var asOf = GD.wsAsOf();
+    return el("div", { style: { "margin-top": "18px" } }, [
+      labelled(f.kind === "fx"
+        ? "What it converts inside each material"
+        : "What it is worth inside each material"),
+      el("div", { class: "grid g-4", style: { gap: "10px" } },
+        f.materials.map(function (m) {
+          var w = worthIn(f, m, asOf);
+          var leg = w.value === null ? null : { value: w.value };
+          var share = w.share;
+          return el("button", {
+            class: "card is-hoverable", type: "button",
+            style: {
+              padding: "11px 12px", "text-align": "left", display: "grid", gap: "4px",
+              cursor: "pointer", "min-width": "0"
+            },
+            onclick: function () {
+              GD.go("pricecheck");
+              setTimeout(function () {
+                if (GD.filterPriceCheck) GD.filterPriceCheck(m.id);
+              }, 80);
+            }
+          }, [
+            el("div", {
+              style: {
+                "font-size": "var(--t-xs)", color: "var(--ink-3)", overflow: "hidden",
+                "text-overflow": "ellipsis", "white-space": "nowrap"
+              },
+              text: m.name
+            }),
+            el("div", { class: "num", style: { "font-weight": "600" },
+              text: leg ? GD.curUnit(leg.value, m) + "/" + m.unit : "—" }),
+            el("div", {
+              style: { "font-size": "var(--t-xs)", color: "var(--ink-4)" },
+              text: share === null ? "" : fmt.pct(share, 0) + " of driver cost"
+            })
+          ]);
+        }))
+    ]);
+  }
+
+  /* ============================================= what it did to our materials */
 
   function materialRows(ws) {
     var dates = ws.materials[0] && ws.materials[0].drivers[0]
@@ -345,7 +465,7 @@
       var prev = series.length > 1 ? series[series.length - 2] : null;
       var q = series.length > 3 ? series[series.length - 4] : first;
       return {
-        m: m, series: series, dates: dates, now: now,
+        m: m, series: series, now: now,
         month: prev ? (now - prev) / prev : null,
         quarter: q ? (now - q) / q : null,
         year: first ? (now - first) / first : null,
@@ -414,8 +534,7 @@
           {
             key: "month", label: "1 month", num: true, width: "92px",
             render: function (r) {
-              return el("span", { class: GD.toneFor(r.month),
-                text: fmt.signedPct(r.month, 1) });
+              return el("span", { class: GD.toneFor(r.month), text: fmt.signedPct(r.month, 1) });
             }
           },
           {
@@ -473,81 +592,6 @@
     });
   }
 
-  /* -------------------------------------------------------------- the feed detail */
-
-  function showFeed(f, ws) {
-    GD.sheet({
-      title: f.name,
-      sub: f.source + " · " + f.unit +
-           (f.mocked ? " · placeholder series for this build" : ""),
-      body: function () {
-        var rows = [
-          ["Latest", el("b", { text: level(f) + " " + f.unit })],
-          ["One month", el("span", { class: GD.toneFor(f.month),
-            text: fmt.signedPct(f.month, 1) })],
-          ["Twelve months", el("span", { class: GD.toneFor(f.year),
-            text: fmt.signedPct(f.year, 1) })],
-          ["12-month range", fmt.n(f.lo, f.lo >= 1000 ? 0 : 2) + " – " +
-            fmt.n(f.hi, f.hi >= 1000 ? 0 : 2)],
-          ["Published in", f.currency + ", " + f.unit],
-          ["Source", f.source]
-        ];
-        return [
-          el("div", { style: { "margin-bottom": "18px" } }, [
-            GD.chart.line({
-              series: [{ name: f.name, values: f.values, color: kindColor(f.kind), weight: 2 }],
-              dates: f.dates, w: 640, h: 210,
-              fmtY: function (v) { return fmt.n(v, v >= 1000 ? 0 : 2); },
-              fmtTip: function (v) { return fmt.n(v, 2) + " " + f.unit; },
-              fmtX: axisDate,
-              label: f.name + " over twelve months"
-            })
-          ]),
-          el("div", { class: "grid g-2" }, [
-            el("div", null, [labelled("The feed"), GD.kv(rows)]),
-            el("div", null, [
-              labelled("What it prices"),
-              GD.kv(f.materials.map(function (m) {
-                var d = null;
-                (m.drivers || []).forEach(function (x) { if (x.key === f.key) d = x; });
-                var legs = P.legs(m, GD.wsAsOf());
-                var leg = null;
-                legs.forEach(function (l) { if (l.key === f.key) leg = l; });
-                return [m.name, el("span", null, [
-                  el("span", { text: leg ? GD.curUnit(leg.value, m) + "/" + m.unit : "—" }),
-                  el("span", {
-                    style: { color: "var(--ink-3)", "margin-left": "6px",
-                             "font-weight": "400", "font-size": "var(--t-xs)" },
-                    text: leg && leg.value && P.driverCost(m, GD.wsAsOf())
-                      ? fmt.pct(leg.value / P.driverCost(m, GD.wsAsOf()), 0) + " of driver cost"
-                      : ""
-                  })
-                ])];
-              }))
-            ])
-          ]),
-          el("p", {
-            style: { "font-size": "var(--t-xs)", color: "var(--ink-3)", "margin-top": "16px" },
-            text: f.note + (f.mocked
-              ? "  This is a placeholder series for this build, not a licensed feed."
-              : "")
-          })
-        ];
-      },
-      foot: function (close) {
-        return [
-          el("button", {
-            class: "btn btn-primary", type: "button", "data-autofocus": true,
-            onclick: close, text: "Close"
-          }),
-          el("span", { style: { flex: "1" } }),
-          el("span", { class: "card-sub",
-            text: "A feed is on this screen because something is priced off it." })
-        ];
-      }
-    });
-  }
-
   /* ===================================================================== the surface */
 
   GD.route("prices", {
@@ -561,11 +605,13 @@
       var all = feeds(ws);
       var list = all.filter(moves);
       var held = all.filter(function (f) { return !moves(f); });
-      var rows = materialRows(ws);
-
-      var rising = rows.filter(function (r) { return r.year > 0; }).length;
-      var worst = rows.slice().sort(function (a, b) { return b.year - a.year; })[0];
-      var best = rows.slice().sort(function (a, b) { return a.year - b.year; })[0];
+      /* Open on the feed with the widest reach rather than the first alphabetically. On a
+         book that imports most of what it buys that is the FX pair, which is under every
+         material — and is exactly the thing a buyer here would check first. */
+      var widest = list.slice().sort(function (a, b) {
+        return b.materials.length - a.materials.length;
+      })[0];
+      var state = { feed: widest || list[0], window: "6M" };
 
       wrap.appendChild(el("div", { class: "page-head" }, [
         el("div", { class: "ph-text" }, [
@@ -582,56 +628,45 @@
         ])
       ]));
 
-      /* One line of read, so the screen says something before it shows everything. */
-      wrap.appendChild(GD.card({
-        body: [el("div", { class: "statline", style: { margin: "-18px" } }, [
-          el("div", null, [
-            el("div", { class: "k", text: "Driver cost rising" }),
-            el("div", { class: "v " + (rising > rows.length / 2 ? "val-up" : "") },
-              rising + " of " + rows.length)
-          ]),
-          el("div", null, [
-            el("div", { class: "k", text: "Dearest move, 12 months" }),
-            el("div", { class: "v val-up" }, fmt.signedPct(worst.year, 1)),
-            el("div", { style: { "font-size": "var(--t-xs)", color: "var(--ink-3)" },
-              text: worst.m.name })
-          ]),
-          el("div", null, [
-            el("div", { class: "k", text: "Keenest move, 12 months" }),
-            el("div", { class: "v val-down" }, fmt.signedPct(best.year, 1)),
-            el("div", { style: { "font-size": "var(--t-xs)", color: "var(--ink-3)" },
-              text: best.m.name })
-          ]),
-          el("div", null, [
-            el("div", { class: "k", text: "Feeds on placeholder data" }),
-            el("div", { class: "v" },
-              list.filter(function (f) { return f.mocked; }).length + " of " + list.length),
-            el("div", { style: { "font-size": "var(--t-xs)", color: "var(--ink-3)" },
-              text: "labelled wherever they appear" })
-          ])
-        ])]
-      }));
+      /* The instrument and its watchlist, side by side and swapped in place rather than by
+         re-rendering the surface: a route re-render restarts the entrance stagger and throws
+         the scroll position away, which is a lot of movement for picking a different feed. */
+      var main = el("div", { class: "grid g-main" });
+      var leftSlot = el("div", { style: { "min-width": "0" } });
+      var rightSlot = el("div", { style: { "min-width": "0" } });
+      main.appendChild(leftSlot);
+      main.appendChild(rightSlot);
+      wrap.appendChild(main);
 
-      /* 1 — the feeds */
-      wrap.appendChild(el("div", { class: "grid g-3" },
-        list.map(function (f) {
-          return feedTile(f, ws, function (picked) { showFeed(picked, ws); });
-        })));
+      function drawInstrument() {
+        GD.clear(leftSlot);
+        leftSlot.appendChild(instrumentCard(state.feed, ws, state, function (k) {
+          state.window = k;
+          drawInstrument();
+        }));
+      }
+      function drawList() {
+        GD.clear(rightSlot);
+        rightSlot.appendChild(watchlist(list, state.feed, function (f) {
+          if (f.key === state.feed.key) return;
+          state.feed = f;
+          drawInstrument();
+          drawList();
+        }));
+      }
+      drawInstrument();
+      drawList();
 
       if (held.length) {
         wrap.appendChild(el("p", {
-          style: { "font-size": "var(--t-xs)", color: "var(--ink-3)", "margin": "-8px 2px 0" },
+          style: { "font-size": "var(--t-xs)", color: "var(--ink-3)", margin: "-8px 2px 0" },
           text: held.length + " more legs are held constant and have no market to track — " +
                 held.map(function (f) { return f.name; }).join(", ") +
                 ". They are part of driver cost and appear on the material rows below."
         }));
       }
 
-      /* 2 — the comparison */
-      wrap.appendChild(chartCard(all, ws));
-
-      /* 3 — the bridge */
-      wrap.appendChild(materialsCard(ws, rows));
+      wrap.appendChild(materialsCard(ws, materialRows(ws)));
     }
   });
 

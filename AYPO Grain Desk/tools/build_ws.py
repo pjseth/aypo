@@ -86,17 +86,27 @@ def walk(rng, anchor_last, drift_pct, vol_pct, n=13):
 
 
 def daily_from_monthly(rng, monthly, days=180):
-    """Interpolate the monthly anchors into a daily path for the market strip, so the strip
-    and the driver series are the same numbers at the same dates rather than two guesses."""
+    """Interpolate the monthly anchors into a daily path for the charts, so the strip, the
+    market screen and the driver series are the same numbers at the same dates rather than
+    three guesses.
+
+    The wiggle between anchors is an AR(1) process rather than independent noise per day.
+    Independent noise gives every point its own unrelated error, which reads as static; a
+    price series wanders, so each day's deviation keeps most of the day before's. The anchors
+    are still hit exactly, because the deviation is damped to zero as each one approaches.
+    """
     anchors = monthly[:]
     out = []
     per = max(1, days // (len(anchors) - 1))
+    dev = 0.0
     for i in range(len(anchors) - 1):
         a, b = anchors[i], anchors[i + 1]
         for k in range(per):
             t = k / per
-            jitter = 1.0 + rng.gauss(0, 0.0035)
-            out.append(round((a + (b - a) * t) * jitter, 4))
+            dev = 0.86 * dev + rng.gauss(0, 0.0022)
+            # Pull the deviation out as the next anchor approaches, so the monthly print is
+            # the value on the day it prints and not an interpolation artefact.
+            out.append(round((a + (b - a) * t) * (1 + dev * (1 - t)), 4))
     out.append(anchors[-1])
     return out[-days:]
 
@@ -111,24 +121,30 @@ def daily_dates(n, end=AS_OF):
 # Everything below is invented. Levels are chosen to be plausible for a Philippine food
 # manufacturer importing about 60% of its raw materials, but no figure here came from URC.
 
-INSTRUMENTS = [
-    # key, label, venue, unit, currency, last, drift, vol, role
-    ("RC",     "ICE Robusta coffee, front month", "ICE Europe", "USD/MT", "USD", 4182.0, 0.013, 0.045, "index"),
-    ("BRN",    "Brent crude, front month",        "ICE",        "USD/bbl", "USD", 71.40, -0.004, 0.038, "index"),
-    ("SB",     "ICE Sugar No.11, front month",    "ICE US",     "USc/lb",  "USD", 19.85, 0.006, 0.040, "index"),
-    ("FCPO",   "Bursa crude palm oil, 3rd month", "Bursa",      "MYR/MT",  "MYR", 4310.0, 0.008, 0.036, "index"),
-    ("USDPHP", "USD / PHP spot",                  "BSP ref",    "PHP/USD", "PHP", 58.20, 0.004, 0.012, "fx"),
-    ("FRTBOX", "Container freight, origin–Manila", "Drewry",     "USD/MT",  "USD", 62.0, -0.010, 0.060, "freight"),
+# Every feed anything is priced off. `strip` marks the six that earn a place on the market
+# strip along the top; the rest are on the market screen only. All of them carry a daily path
+# so the instrument chart has something to draw at 1M and 3M.
+FEEDS = [
+    # key, label, venue, unit, currency, last, drift, vol, role, strip
+    ("RC",      "ICE Robusta coffee, front month",  "ICE Europe",  "USD/MT",  "USD", 4182.0, 0.013, 0.045, "index", True),
+    ("BRN",     "Brent crude, front month",         "ICE",         "USD/bbl", "USD", 71.40, -0.004, 0.038, "index", True),
+    ("SB",      "ICE Sugar No.11, front month",     "ICE US",      "USc/lb",  "USD", 19.85, 0.006, 0.040, "index", True),
+    ("FCPO",    "Bursa crude palm oil, 3rd month",  "Bursa",       "MYR/MT",  "MYR", 4310.0, 0.008, 0.036, "index", True),
+    ("USDPHP",  "USD / PHP spot",                   "BSP ref",     "PHP/USD", "PHP", 58.20, 0.004, 0.012, "fx", True),
+    ("FRTBOX",  "Container freight, origin–Manila", "Drewry",      "USD/MT",  "USD", 62.0, -0.010, 0.060, "freight", True),
+    ("POTEU",   "EU potato flake index",            "CRM Europe",  "EUR/MT",  "EUR", 1685.0, 0.011, 0.030, "index", False),
+    ("ZW",      "CBOT soft red winter wheat, Dec",  "CBOT",        "USc/bu",  "USD", 546.0, 0.002, 0.042, "index", False),
+    ("KRAFT",   "Containerboard kraftliner, Asia",  "Fastmarkets", "USD/MT",  "USD", 612.0, 0.005, 0.025, "index", False),
+    ("BOPP",    "BOPP film grade resin, SE Asia",   "Platts",      "USD/MT",  "USD", 1683.0, -0.003, 0.028, "index", False),
+    ("FRTBULK", "Supramax bulk, origin–Manila",     "Baltic",      "USD/MT",  "USD", 46.0, -0.006, 0.055, "freight", False),
 ]
 
-# Monthly indices that do not earn a place on the strip but do drive a material.
-EXTRA_SERIES = [
-    ("POTEU",  "EU potato flake index",             "CRM Europe",  "EUR/MT",  "EUR", 1685.0, 0.011, 0.030),
-    ("ZW",     "CBOT soft red winter wheat, Dec",   "CBOT",        "USc/bu",  "USD", 546.0, 0.002, 0.042),
-    ("KRAFT",  "Containerboard kraftliner, Asia",   "Fastmarkets", "USD/MT",  "USD", 612.0, 0.005, 0.025),
-    ("BOPP",   "BOPP film grade resin, SE Asia",    "Platts",      "USD/MT",  "USD", 1683.0, -0.003, 0.028),
-    ("FRTBULK", "Supramax bulk, origin–Manila",     "Baltic",      "USD/MT",  "USD", 46.0, -0.006, 0.055),
-]
+# Daily points across the thirteen monthly anchors: 2025-10-01 to 2026-10-13.
+DAILY_DAYS = 378
+
+# Feeds with no licensed source behind them in this build. Labelled wherever they
+# appear, on screen and in every generated document.
+MOCKED_FEEDS = ("POTEU", "KRAFT", "BOPP", "FRTBULK", "FRTBOX", "USDPHP")
 
 MATERIALS = [
     # id, name, category, unit, currency, budget, budget_note, crop feed, drivers
@@ -367,11 +383,9 @@ JUNK = [
 
 # ========================================================================== driver series
 def build_series(rng):
-    """Every monthly series in the URC workspace, keyed by driver key."""
+    """Every monthly series in the workspace, keyed by feed key."""
     series = {}
-    for key, label, venue, unit, cur, last, drift, vol in (
-            [(k, l, v, u, c, la, d, vo) for (k, l, v, u, c, la, d, vo, _role) in INSTRUMENTS]
-            + list(EXTRA_SERIES)):
+    for key, label, venue, unit, cur, last, drift, vol, _role, _strip in FEEDS:
         series[key] = {
             "key": key, "label": label, "source": venue, "unit": unit, "currency": cur,
             "dates": MONTHS[:], "values": walk(rng, last, drift, vol),
@@ -380,16 +394,21 @@ def build_series(rng):
 
 
 def build_instruments(rng, series):
-    """Market-strip instruments, in the shape `app.js` already renders."""
+    """One instrument per feed, in the shape `app.js` and `surfaces/prices.js` render.
+
+    `history` is a daily path interpolated across the monthly anchors. The anchors are the
+    levels; the path between them is generated, `synthetic_history` says so, and every screen
+    that draws it repeats that in words.
+    """
     out = []
-    for key, label, venue, unit, cur, last, drift, vol, role in INSTRUMENTS:
+    for key, label, venue, unit, cur, last, drift, vol, role, strip in FEEDS:
         monthly = series[key]["values"]
-        hist = daily_from_monthly(rng, monthly, 180)
+        hist = daily_from_monthly(rng, monthly, DAILY_DAYS)
         dates = daily_dates(len(hist))
         prev = hist[-2] if len(hist) > 1 else hist[-1]
         out.append({
             "key": key, "label": label, "venue": venue, "unit": unit,
-            "currency": cur, "role": role,
+            "currency": cur, "role": role, "strip": strip,
             "last": round(hist[-1], 4), "prev": round(prev, 4),
             "change": round(hist[-1] - prev, 4),
             "change_pct": round((hist[-1] / prev - 1) * 100, 3) if prev else 0.0,
@@ -416,7 +435,7 @@ def driver_for(spec, series):
         mocked = True
     else:
         s = series[key]
-        mocked = key in ("POTEU", "KRAFT", "BOPP", "FRTBULK", "FRTBOX", "SRADOM")
+        mocked = key in MOCKED_FEEDS
     return {
         "key": key,
         "name": s["label"],

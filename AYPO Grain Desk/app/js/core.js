@@ -350,14 +350,33 @@
       tx.textContent = fmtX(dates[i]);
       svg.appendChild(tx);
     }
-    series.forEach(function (s) {
-      var d = "", started = false;
+    /* A dashed reference level — the price at the start of the window, so the whole chart
+       reads as "above or below where this period opened" at a glance. */
+    if (opts.baseline !== undefined && opts.baseline !== null) {
+      svg.appendChild(svgEl("line", {
+        x1: padL, x2: w - padR, y1: Y(opts.baseline).toFixed(2), y2: Y(opts.baseline).toFixed(2),
+        stroke: "var(--border-strong)", "stroke-width": 1, "stroke-dasharray": "4 4"
+      }));
+    }
+
+    series.forEach(function (s, si) {
+      var d = "", started = false, firstX = null, lastX = null;
       s.values.forEach(function (v, idx) {
         if (v === null || v === undefined) return;
         d += (started ? "L" : "M") + X(idx).toFixed(2) + "," + Y(v).toFixed(2);
+        if (firstX === null) firstX = X(idx);
+        lastX = X(idx);
         started = true;
       });
       if (!d) return;
+      /* Area under the first series only. More than one filled region is mud. */
+      if (opts.area && si === 0) {
+        svg.appendChild(svgEl("path", {
+          d: d + "L" + lastX.toFixed(2) + "," + (h - padB) +
+             "L" + firstX.toFixed(2) + "," + (h - padB) + "Z",
+          fill: s.color, opacity: 0.09, stroke: "none"
+        }));
+      }
       svg.appendChild(svgEl("path", {
         d: d, fill: "none", stroke: s.color, "stroke-width": s.weight || 1.75,
         "stroke-linecap": "round", "stroke-linejoin": "round"
@@ -395,13 +414,19 @@
         return "<div class='tip-row'><span class='tip-mute'>" + esc(s.name) + "</span><b>" +
           esc(opts.fmtTip ? opts.fmtTip(v, s) : nf(v, 2)) + "</b></div>";
       }).filter(Boolean);
-      tip.show(ev, "<b>" + esc(fmtDate(dates[idx])) + "</b>" + rows.join(""));
+      /* A caller that wants the scrubbed value in its own header takes `onHover` and sets
+         `tip: false`; two readouts of the same number following the cursor is one too many. */
+      if (opts.onHover) opts.onHover(idx, dates[idx]);
+      if (opts.tip !== false) {
+        tip.show(ev, "<b>" + esc(fmtDate(dates[idx])) + "</b>" + rows.join(""));
+      }
     }
     hit.addEventListener("pointermove", at);
     hit.addEventListener("pointerleave", function () {
       cross.setAttribute("opacity", 0);
       dots.forEach(function (d) { d.setAttribute("opacity", 0); });
       tip.hide();
+      if (opts.onLeave) opts.onLeave();
     });
     return svg;
   }
