@@ -20,6 +20,7 @@ py -3.11 tools/test_lib.py               # the price math and the spend reconcil
 py -3.11 tools/test_app.py               # every route, in every workspace
 py -3.11 tools/test_flows.py             # the three new flows, driven through the real DOM
 py -3.11 tools/shots.py                  # screenshots of the states worth looking at
+py -3.11 tools/dump.py bulletin          # print a generated document, to read it
 ```
 
 Use `py -3.11`; bare `python` on this machine is the Microsoft Store stub and exits 49.
@@ -88,6 +89,7 @@ Two figures worth knowing before reading the code:
 
 ## A second customer: materials, not wheat
 
+
 `v2-urc-essentials` extends the desk from one mill's wheat book to any material with a
 published price driver, for a prospective customer who buys about 3,000 suppliers' worth of
 coffee, potato flakes, resin and cartons. **The wheat desk is untouched.** `app/js/data.js`
@@ -142,6 +144,25 @@ used. **Where a feed has no print for the period the bulletin says so** rather t
 for the nearest number — one such gap is planted in the demo data. Export is blocked until a
 person approves the draft, and editing an approved draft closes the gate again, because the
 thing that was approved is no longer the thing on screen.
+
+### Running the demo
+
+`app/index.html?ws=urc#pricecheck` opens straight into the demo workspace; without the query
+string the app is the wheat desk, which is what the mill should get. The sidebar head
+switches between the two at any time.
+
+1. **Price check.** The board opens on *Worth a call: Kalinga Highlands* — green coffee,
+   ₱6,723/MT above the top of its fair band, ₱1.34M on the parcel offered, and a premium that
+   has widened four quarters running. Open the breakdown: two published drivers, the FX
+   conversion, the premium, and the line that proves they add to the quoted price. Then
+   **Negotiation brief** — and the table beneath it, which is every figure the brief is
+   allowed to contain. Resin is the counter-example: inside the band and under budget.
+2. **Spend.** *Load the sample export* — 1,316 lines in a few milliseconds, 1,222 classified,
+   six duplicates, and 88 lines waiting on nine decisions. The first decision is one vendor
+   spelling and clears 76 of them. The report ties to the line items and says so.
+3. **Market bulletin.** *Generate draft* — nine sections, every figure sourced, and one that
+   says it has no data rather than filling the gap. Edit a line, approve it, export it. Edit
+   it again and the export closes.
 
 ### What the model does, and what it is not allowed to do
 
