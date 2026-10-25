@@ -22,6 +22,56 @@
     if (w.key === "ufm") ufm = w;
   });
 
+  ok("the workspaces loaded", !!urc && !!ufm);
+  ok("the wheat desk is the default workspace", GD.wsAll()[0].key === "ufm",
+     GD.wsAll().map(function (w) { return w.key; }).join(","));
+  ok("the demo workspace is labelled as demo data", urc.demo === true && ufm.demo === false);
+  ok("every material declares a category, a unit and a currency",
+     urc.materials.concat(ufm.materials).every(function (m) {
+       return (m.category === "raw" || m.category === "packaging") && m.unit && m.currency;
+     }));
+  ok("every material declares at least one price driver",
+     urc.materials.concat(ufm.materials).every(function (m) {
+       return (m.drivers || []).length > 0;
+     }));
+  ok("every driver declares its source, unit and conversion",
+     urc.materials.concat(ufm.materials).every(function (m) {
+       return m.drivers.every(function (d) {
+         return d.source && d.unit && d.currency &&
+           typeof d.per_unit === "number" && typeof d.offset === "number" &&
+           d.dates.length === d.values.length && d.dates.length > 0;
+       });
+     }));
+  ok("every quote names a material and a supplier that exist",
+     [urc, ufm].every(function (ws) {
+       return ws.quotes.every(function (q) {
+         return !!GD.material(q.material_id, ws) && !!GD.supplier(q.supplier_id, ws);
+       });
+     }));
+  ok("every material has between two and four suppliers quoting it",
+     urc.materials.every(function (m) {
+       var n = {};
+       urc.quotes.forEach(function (q) { if (q.material_id === m.id) n[q.supplier_id] = 1; });
+       var c = Object.keys(n).length;
+       return c >= 2 && c <= 4;
+     }),
+     urc.materials.map(function (m) {
+       var n = {};
+       urc.quotes.forEach(function (q) { if (q.material_id === m.id) n[q.supplier_id] = 1; });
+       return m.id + ":" + Object.keys(n).length;
+     }).join(" "));
+  ok("the demo carries twelve months of quotes",
+     (function () {
+       var months = {};
+       urc.quotes.forEach(function (q) { months[q.date.slice(0, 7)] = 1; });
+       return Object.keys(months).length === 12;
+     })());
+  ok("every fx pair a material needs is in the table",
+     urc.materials.concat(ufm.materials).every(function (m) {
+       return m.drivers.every(function (d) { return GD.fx(d.currency, m.currency) !== null; });
+     }));
+  ok("the home currency is PHP in the demo workspace", urc.home_currency === "PHP");
+
   /* ============================================================== pricing: primitives */
 
   ok("percentile p25 of [1,2,3,4]", close(P.percentile([1, 2, 3, 4], 0.25), 1.75, 1e-9),

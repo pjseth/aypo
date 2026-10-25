@@ -117,7 +117,7 @@ INSTRUMENTS = [
     ("BRN",    "Brent crude, front month",        "ICE",        "USD/bbl", "USD", 71.40, -0.004, 0.038, "index"),
     ("SB",     "ICE Sugar No.11, front month",    "ICE US",     "USc/lb",  "USD", 19.85, 0.006, 0.040, "index"),
     ("FCPO",   "Bursa crude palm oil, 3rd month", "Bursa",      "MYR/MT",  "MYR", 4310.0, 0.008, 0.036, "index"),
-    ("USDPHP", "USD / PHP spot",                  "BSP ref",    "PHP",     "PHP", 58.20, 0.004, 0.012, "fx"),
+    ("USDPHP", "USD / PHP spot",                  "BSP ref",    "PHP/USD", "PHP", 58.20, 0.004, 0.012, "fx"),
     ("WCIMNL", "Drewry WCI Shanghai–Manila",      "Drewry",     "USD/FEU", "USD", 1482.0, -0.010, 0.060, "freight"),
 ]
 
@@ -406,11 +406,14 @@ def driver_for(spec, series):
     """Expand a material's driver spec into the payload shape the app reads."""
     key = spec["key"]
     if spec.get("flat"):
-        # A held-flat spread: it still needs a series so the chart and the bulletin can treat
-        # every leg the same way, and a flat line is the honest picture of a held constant.
+        # A held-flat spread still needs a series, so that every leg is read the same way and
+        # a flat line is the honest picture of a held constant. The constant itself is the
+        # series - not a dummy 1.0 with the real figure hidden in the offset, which would have
+        # the bulletin reporting "converter charge: 1.00 PHP/MT".
         s = {"key": key, "label": spec["label"], "source": spec["source"],
              "unit": spec["unit"], "currency": spec["currency"],
-             "dates": MONTHS[:], "values": [1.0] * len(MONTHS)}
+             "dates": MONTHS[:], "values": [spec["offset"]] * len(MONTHS)}
+        spec = dict(spec, per_unit=1.0, offset=0.0)
         mocked = True
     else:
         s = series[key]
@@ -709,7 +712,13 @@ def build_ufm(desk):
             "budget_price": None,
             "budget_note": "No budget price is held for wheat on this desk — the mill prices "
                            "against the futures curve and the class median, not a budget rate.",
-            "crop": None,
+            # Wheat is about as agricultural as an input gets, so "not applicable" would be
+            # nonsense. The crop picture on this desk lives on the Market surface, in Pavin's
+            # own driver board and the WASDE clock, and the bulletin says where to find it.
+            "crop": {"status": "elsewhere",
+                     "reason": "The crop and weather read for wheat lives on the Market "
+                               "surface — the driver board and the WASDE clock — rather than "
+                               "in a crop circular, so there is nothing to restate here."},
             "drivers": [
                 {"key": inst["key"] if inst else "ZWZ26",
                  "name": (inst["label"] if inst else "Futures") + " settlement, in $/t",

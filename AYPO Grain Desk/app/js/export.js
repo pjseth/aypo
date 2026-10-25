@@ -79,9 +79,65 @@
     "       padding: 0.6mm 2mm; font-size: 8pt; color: #4d535d; }"
   ].join("\n");
 
-  /* `bodyHtml` is markup this app authored — never data interpolated raw. Callers escape
+  /* Both generated documents — the negotiation brief and the market bulletin — are written
+     as plain text, because plain text is what a person edits and what they paste into an
+     email. This turns that text into the markup the printer gets. The conventions are the
+     ones the documents already use:
+
+       first line            the title
+       "## " / "### "        headings
+       "1 · HEADING"         a numbered section heading
+       "SOURCES"             a bare capitalised line is a heading too
+       "· "                  a bullet
+       anything else         a paragraph; the first few are the standfirst
+
+     One function rather than one per surface, because two copies of a transform like this
+     drift apart and only the printed page shows it. */
+  GD.docHtml = function (text, opts) {
+    opts = opts || {};
+    var lines = String(text).split("\n");
+    var html = [], inList = false, seenHead = false, bodyLines = 0;
+    function closeList() { if (inList) { html.push("</ul>"); inList = false; } }
+
+    lines.forEach(function (line, i) {
+      if (/^### /.test(line)) {
+        closeList(); html.push("<h3>" + GD.esc(line.slice(4)) + "</h3>");
+        seenHead = true; return;
+      }
+      if (/^## /.test(line)) {
+        closeList(); html.push("<h2>" + GD.esc(line.slice(3)) + "</h2>");
+        seenHead = true; return;
+      }
+      /* "1 · WHERE THIS QUOTE SITS", or a bare capitalised line like "SOURCES". */
+      if (/^\d+ · \S/.test(line) || (/^[A-Z][A-Z0-9 ,.'&—–-]{3,}$/.test(line) && i > 0)) {
+        closeList(); html.push("<h2>" + GD.esc(line) + "</h2>");
+        seenHead = true; return;
+      }
+      if (i === 0) { html.push("<h1>" + GD.esc(line) + "</h1>"); return; }
+      if (/^· /.test(line)) {
+        if (!inList) { html.push("<ul>"); inList = true; }
+        html.push("<li>" + GD.esc(line.slice(2)) + "</li>");
+        return;
+      }
+      closeList();
+      if (!line.trim()) return;
+      bodyLines++;
+      html.push(!seenHead && bodyLines <= 3
+        ? "<p class='sub'>" + GD.esc(line) + "</p>"
+        : "<p>" + GD.esc(line) + "</p>");
+    });
+    closeList();
+    if (opts.foot) html.push("<div class='foot'>" + GD.esc(opts.foot) + "</div>");
+    return html.join("\n");
+  };
+
+  /* Laying the document out for paper and handing it to the printer is two jobs, and only
+     the first one can be inspected: a print dialogue cannot be read by a test. So the layout
+     is its own call, and `printDoc` is that plus the dialogue.
+
+     `bodyHtml` is markup this app authored — never data interpolated raw. Callers escape
      with GD.esc on the way in. */
-  GD.printDoc = function (title, bodyHtml) {
+  GD.printableFrame = function (title, bodyHtml) {
     var frame = GD.el("iframe", {
       "aria-hidden": "true",
       style: { position: "fixed", right: "0", bottom: "0", width: "1px", height: "1px",
@@ -93,6 +149,11 @@
     doc.write("<!doctype html><html><head><meta charset='utf-8'><title>" + GD.esc(title) +
       "</title><style>" + PRINT_CSS + "</style></head><body>" + bodyHtml + "</body></html>");
     doc.close();
+    return frame;
+  };
+
+  GD.printDoc = function (title, bodyHtml) {
+    var frame = GD.printableFrame(title, bodyHtml);
     var done = false;
     function go() {
       if (done) return;

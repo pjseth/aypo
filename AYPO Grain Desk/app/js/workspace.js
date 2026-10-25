@@ -31,7 +31,17 @@
     try { window.localStorage.setItem(KEY, k); } catch (e) { /* private mode — fine */ }
   }
 
-  active = byKey(stored()) || W.workspaces[0] || null;
+  /* `?ws=urc#pricecheck` opens straight into a workspace, which is what a demo link needs:
+     the default has to stay the wheat desk for the customer who uses it every day, and a
+     bookmark is a better answer than asking the presenter to remember three clicks. */
+  function fromQuery() {
+    var m = String(location.search || "").match(/[?&]ws=([A-Za-z0-9_-]+)/);
+    return m ? m[1] : null;
+  }
+
+  var asked = fromQuery();
+  active = byKey(asked) || byKey(stored()) || W.workspaces[0] || null;
+  if (asked && active && active.key === asked) store(asked);
 
   GD.wsAll = function () { return W.workspaces; };
   GD.wsKey = function () { return active ? active.key : null; };

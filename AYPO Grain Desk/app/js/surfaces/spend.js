@@ -122,6 +122,9 @@
      suspiciously round "1 ms" makes a true number look like a placeholder. */
   function msText(ms) {
     if (ms === null || ms === undefined) return "no timing";
+    /* A headless browser running on virtual time measures this as zero, and "0.0 ms" reads
+       as a broken clock rather than a fast one. */
+    if (ms < 1) return "under a millisecond";
     return fmt.n(ms, ms < 10 ? 1 : 0) + " ms";
   }
 

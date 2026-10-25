@@ -86,7 +86,10 @@
       var b = valueOn(ins.dates, ins.history, w.to);
       if (a !== null && b !== null) {
         return {
-          kind: "daily", source: ins.venue + " · " + ins.label,
+          /* The venue alone: the line that prints this already names the driver, and
+             "ICE · Brent crude, front month" next to "Brent crude, front month:" is the
+             citation saying the thing twice. */
+          kind: "daily", source: ins.venue,
           unit: ins.unit, from: a.date, to: b.date,
           was: a.value, now: b.value,
           change: P.round2(b.value - a.value),
@@ -108,6 +111,13 @@
          is a fact about the period rather than a gap in the data. */
       fresh: i1 !== i0
     };
+  }
+
+  /* True when a driver's own series does not change across the window — the leg is pegged,
+     whatever the instrument behind it did. */
+  function held(driver, w) {
+    var a = P.valueAt(driver, w.from), b = P.valueAt(driver, w.to);
+    return a !== null && b !== null && a === b;
   }
 
   function valueOn(dates, values, date) {
@@ -151,7 +161,8 @@
       ticks: ticks,
       gap: !ticks.length,
       lines: ticks.length ? ticks.map(function (t) {
-        return "· " + t.label + " at " + fmtLevel(t.now, t.unit) + " " + t.unit +
+        return "· " + t.label + " at " + fmtLevel(t.now, t.unit) +
+          (/\//.test(t.unit) ? " " + t.unit : "") +
           (t.pct === null ? ", no comparable print in the window"
             : ", " + fmt.signedPct(t.pct, 1) + " over the fortnight") +
           "  (" + t.venue + ", " + fmt.date(t.to) + ")";
@@ -172,7 +183,9 @@
       var sectionGaps = [];
 
       var driverLines = [];
-      (m.drivers || []).forEach(function (d) {
+      /* Freight gets its own section below, so listing it here too would print the same
+         sentence twice under two headings. */
+      (m.drivers || []).filter(function (d) { return d.kind !== "freight"; }).forEach(function (d) {
         var mv = move(d, w);
         if (!mv) {
           sectionGaps.push(d.name + " has no series in this build");
@@ -186,11 +199,25 @@
             ".  (" + mv.source + ")");
           return;
         }
+        /* A spread that is held constant has not "moved 0.0% from itself" — it is held, and
+           saying so is both shorter and the thing a reader needs to know about it. */
+        if (mv.was === mv.now) {
+          driverLines.push("· " + d.name + ": held flat at " + fmtLevel(mv.now, mv.unit) +
+            " " + mv.unit + ".  (" + mv.source + ")" + (d.mocked ? "  [mock feed]" : ""));
+          return;
+        }
         driverLines.push("· " + d.name + ": " + fmtLevel(mv.now, mv.unit) + " " + mv.unit +
           ", " + (mv.pct === null ? "level" : fmt.signedPct(mv.pct, 1)) + " from " +
           fmtLevel(mv.was, mv.unit) + " on " + fmt.date(mv.from) +
           ".  (" + mv.source + ", print of " + fmt.date(mv.to) + ")" +
-          (d.mocked ? "  [mock feed]" : ""));
+          (d.mocked ? "  [mock feed]" : "") +
+          /* The market moved and the model did not. That happens when this desk holds the
+             leg at one observed settlement — true of every wheat class, where the Quote
+             Board reconstructs against a single print — and leaving it unsaid would put a
+             falling index next to an unchanged driver cost with no explanation. */
+          (held(d, w) ? "  The leg in the price model is held at the " +
+            fmt.date(d.dates[P.indexAt(d, w.to)]) + " print, so driver cost below does not " +
+            "move with it." : ""));
       });
 
       /* FX — a section of its own because it is half the move on an imported material. */
@@ -230,26 +257,40 @@
         var d = null;
         (m.drivers || []).forEach(function (x) { if (x.key === l.key) d = x; });
         var mv = d ? move(d, w) : null;
-        return "· " + l.name + " contributes " +
-          GD.cur(l.value, m.currency, Math.abs(l.value) >= 1000 ? 0 : 2) + "/" + m.unit +
-          (mv && mv.fresh && mv.pct !== null ? ", " + fmt.signedPct(mv.pct, 1) +
-            " over the fortnight" : mv && !mv.fresh ? ", unchanged since " +
-            fmt.date(mv.to) : "") +
+        /* The move is stated between the dates it was actually measured between. A monthly
+           index read on the 29th and again on the 13th moved between two monthly prints, not
+           "over the fortnight", and saying the latter would be a small lie. */
+        return "· " + l.name + " contributes " + GD.curUnit(l.value, m) + "/" + m.unit +
+          (mv && mv.fresh && mv.pct !== null
+            ? ", " + fmt.signedPct(mv.pct, 1) + " since its " + fmt.dateShort(mv.from) + " print"
+            : mv && !mv.fresh ? ", unchanged since " + fmt.date(mv.to) : "") +
           ".  (" + l.source + ")";
-      }) : ["· " + m.name + " carries no freight leg — it is bought delivered from a " +
-            "domestic supplier, so freight is inside the supplier's own number."];
+      }) : ["· No freight leg on this material — it is bought delivered from a domestic " +
+            "supplier, so freight sits inside the supplier's own number."];
 
       /* Crop and weather — the section most likely to have nothing in it. */
       var cropLines, cropState;
       if (!m.crop) {
         cropState = "n/a";
-        cropLines = ["· Not applicable. " + m.name + " is not an agricultural input, so " +
-          "there is no crop or weather read to give."];
+        /* "Not applicable" is only true of something that is not grown. Saying it of a raw
+           material would be the bulletin asserting something false about the material rather
+           than about the feed. */
+        cropLines = [m.category === "packaging"
+          ? "· Not applicable — " + m.name + " is not an agricultural input, so there is no " +
+            "crop or weather read to give."
+          : "· No crop or weather feed is configured for " + m.name + ". Nothing is assumed " +
+            "in its place."];
       } else if (m.crop.status === "unavailable") {
         cropState = "gap";
         sectionGaps.push("crop outlook unavailable");
         gaps++;
         cropLines = ["· No data for this period. " + m.crop.reason];
+      } else if (m.crop.status === "elsewhere") {
+        /* Not a gap: the read exists, it just is not this document's job to restate it.
+           Counting it as missing data would inflate the one number on this page that is
+           supposed to mean something. */
+        cropState = "elsewhere";
+        cropLines = ["· " + m.crop.reason];
       } else {
         cropState = "ok";
         cropLines = ["· " + m.crop.headline + ". " + m.crop.body +
@@ -260,17 +301,14 @@
       var costMove = (costNow !== null && costThen !== null)
         ? P.round2(costNow - costThen) : null;
       var costPct = (costMove !== null && costThen) ? costMove / costThen : null;
+      /* The driver-cost move is the section's own headline a few lines above; repeating it
+         here verbatim is the kind of padding that makes a bulletin feel generated. This
+         section starts with what a buyer can do about it, and only speaks about driver cost
+         when there is none to report. */
       var meaning = [];
       if (costMove === null) {
         meaning.push("· Driver cost cannot be computed for this period, so there is no " +
           "buying read to give.");
-      } else {
-        meaning.push("· Driver cost is " +
-          (costMove === 0 ? "unchanged at " + GD.curUnit(costNow, m)
-            : GD.curUnitSigned(costMove, m) + " to " +
-              GD.curUnit(costNow, m)) + "/" + m.unit +
-          (costPct === null || costMove === 0 ? "" : " (" + fmt.signedPct(costPct, 1) + ")") +
-          " over the fortnight.");
       }
       if (!keen) {
         meaning.push("· No live quote is on the board for " + m.name + ", so there is " +
@@ -340,11 +378,15 @@
         "of the book sits" + (rising ? ", and rising drivers will make it worse." : ".");
     }
     if (a.position === "below" && (a.budget ? !a.budget.over : true)) {
-      return falling
-        ? "Keen, but drivers are still falling — cover the near requirement and leave the " +
-          "rest open."
-        : "Keen against both the band and the budget. Worth covering more of the " +
-          "requirement at this level.";
+      if (falling) {
+        return "Keen, but drivers are still falling — cover the near requirement and leave " +
+          "the rest open.";
+      }
+      return a.budget
+        ? "Keen against both the band and the budget. Worth covering more of the " +
+          "requirement at this level."
+        : "Keen against the band. No budget rate is held for this material, so the band is " +
+          "the only yardstick — on it, this is worth taking more of.";
     }
     if (a.budget && a.budget.over) {
       return "The premium is normal, so the gap to budget is a product-cost conversation " +
@@ -377,12 +419,13 @@
         return;
       }
       if (s.costNow !== null) {
-        L.push("· Driver cost " + GD.curUnit(s.costNow, s.material) + "/" +
-          s.material.unit +
-          (s.costMove === null ? "" :
-            ", " + GD.curUnitSigned(s.costMove, s.material) +
-            (s.costPct === null ? "" : " (" + fmt.signedPct(s.costPct, 1) + ")") +
-            " over the period"));
+        L.push("· Driver cost " + GD.curUnit(s.costNow, s.material) + "/" + s.material.unit +
+          (s.costMove === null ? ""
+            : s.costMove === 0 ? ", unchanged over the period"
+            : ", " + (s.costMove < 0 ? "down " : "up ") +
+              GD.curUnit(Math.abs(s.costMove), s.material) +
+              (s.costPct === null ? "" : " (" + fmt.signedPct(s.costPct, 1) + ")") +
+              " over the period"));
       }
       s.groups.forEach(function (g) {
         L.push("");
@@ -435,30 +478,10 @@
   }
 
   function printable(doc, text) {
-    var lines = String(text).split("\n");
-    var html = [], inList = false;
-    function closeList() { if (inList) { html.push("</ul>"); inList = false; } }
-    lines.forEach(function (line, i) {
-      if (/^## /.test(line)) { closeList(); html.push("<h2>" + GD.esc(line.slice(3)) + "</h2>"); return; }
-      if (/^### /.test(line)) { closeList(); html.push("<h3>" + GD.esc(line.slice(4)) + "</h3>"); return; }
-      if (/^MARKET BULLETIN/.test(line)) {
-        closeList(); html.push("<h1>" + GD.esc(line) + "</h1>"); return;
-      }
-      if (/^· /.test(line)) {
-        if (!inList) { html.push("<ul>"); inList = true; }
-        html.push("<li>" + GD.esc(line.slice(2)) + "</li>");
-        return;
-      }
-      closeList();
-      if (!line.trim()) return;
-      html.push(i < 4 ? "<p class='sub'>" + GD.esc(line) + "</p>"
-                      : "<p>" + GD.esc(line) + "</p>");
+    return GD.docHtml(text, {
+      foot: "Approved " + fmt.date(GD.wsAsOf()) + " · Grain Desk · " + doc.ws.name +
+            (doc.ws.demo ? " · demonstration data, every figure fictional" : "")
     });
-    closeList();
-    html.push("<div class='foot'>" + GD.esc(
-      "Approved " + fmt.date(GD.wsAsOf()) + " · Grain Desk · " + doc.ws.name +
-      (doc.ws.demo ? " · demonstration data, every figure fictional" : "")) + "</div>");
-    return html.join("\n");
   }
 
   var BULLETIN_SYSTEM = [
@@ -688,6 +711,7 @@
                 if (s.kind === "overview") return el("span", { class: "val-mute", text: "—" });
                 if (s.cropState === "ok") return GD.chip("outlook in", "good", "check");
                 if (s.cropState === "gap") return GD.chip("no data", "warn", "alert");
+                if (s.cropState === "elsewhere") return GD.chip("read elsewhere", "info");
                 return GD.chip("not applicable", "outline");
               }
             },

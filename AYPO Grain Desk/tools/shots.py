@@ -44,7 +44,7 @@ SCENARIOS = {
         var q = GD.pricing.latestPerSupplier('green_coffee', GD.ws().quotes)
           .filter(function (x) { return x.supplier_id === 'kalinga'; })[0];
         GD.showPriceCheck(q, GD.ws());
-    """, 1800),
+    """, 3000),
     "urc-brief": ("urc", "pricecheck", """
         var q = GD.pricing.latestPerSupplier('green_coffee', GD.ws().quotes)
           .filter(function (x) { return x.supplier_id === 'kalinga'; })[0];
@@ -55,7 +55,7 @@ SCENARIOS = {
             if (fs[i].textContent.indexOf('Negotiation brief') >= 0) { fs[i].click(); return; }
           }
         }, 500);
-    """, 2600),
+    """, 4000),
     "urc-spend-empty": ("urc", "spend", "", 1200),
     "urc-spend-loaded": ("urc", "spend", """
         var bs = document.querySelectorAll('button');
@@ -105,14 +105,16 @@ SCENARIOS = {
         for (var i = 0; i < bs.length; i++) {
           if (bs[i].textContent.indexOf('How the band is built') >= 0) { bs[i].click(); break; }
         }
-    """, 1800),
+    """, 3000),
     "urc-workspaces": ("urc", "pricecheck", """
         document.querySelector('.side-head').click();
-    """, 1600),
+    """, 3000),
 }
 
+# The workspace comes from the URL, exactly as a demo link would carry it, so the entry point
+# is exercised rather than simulated.
 HEAD = """<script>
-try { localStorage.clear(); localStorage.setItem('graindesk-workspace', '%s'); } catch (e) {}
+try { localStorage.clear(); } catch (e) {}
 </script>
 """
 
@@ -171,8 +173,8 @@ def main():
                     print("  ?     %s is not a scenario" % name)
                     continue
                 wskey, route, script, budget = SCENARIOS[name]
-                probe.write_text(HEAD % wskey + body + TAIL % script, encoding="utf-8")
-                url = "http://127.0.0.1:%d/app/_shot.html#%s" % (port, route)
+                probe.write_text(HEAD + body + TAIL % script, encoding="utf-8")
+                url = "http://127.0.0.1:%d/app/_shot.html?ws=%s#%s" % (port, wskey, route)
                 shot = OUT / (name + ".png")
                 r = subprocess.run(
                     [EDGE, "--headless=new", "--disable-gpu", "--no-sandbox",
