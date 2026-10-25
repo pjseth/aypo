@@ -271,12 +271,16 @@ the watchlist (a flat line has no window to choose and no range to sit in) and a
 material rows instead. Every tick on the market strip is a feed something is priced off, so
 the strip and the screen cannot disagree.
 
-Each instrument carries a daily `history` and `dates` for display, and `synthetic_history`
-says whether that path is generated. The **price model never reads it** — `GD.pricing` reads
-the monthly `driver.dates` / `driver.values` prints, because a quote is argued against a
-published number on a stated date. `tools/fetch_barchart.py` replaces the daily path with real
-closes at build time and leaves the monthly anchors alone, so turning real data on cannot move
-a fair band.
+Each instrument carries a daily `history`, `dates` and `ohlc` for display, plus
+`synthetic_history`, `symbol` and `provider`. `tools/fetch_prices.py` fills these with real
+sessions for every feed that has a public market; the rest get a generated path with an
+invented session shape so the candles have something to draw, and `synthetic_history` is the
+single flag every screen reads to label which is which.
+
+The **price model reads only the monthly** `driver.dates` / `driver.values` prints, never the
+daily series, because a quote is argued against a published number on a stated date. Budget
+rates are derived from each material's own fair price at the last review, so real prices
+moving cannot leave a hand-written budget stranded.
 
 Colour on this screen is the app's convention and not a trading screen's: emerald is a falling
 price, because the cheaper tonne is the good outcome on a buying desk.
@@ -288,7 +292,7 @@ price, because the cheaper tonne is the good outcome on a buying desk.
 | `legs(material, date, fx?)` | one row per driver with every intermediate figure kept |
 | `driverCost(material, date)` / `breakdown(material, quote)` | the sum, and the whole split with `reconciles` |
 | `premiums(material, quotes, asOf, months?)` | every supplier's premium in the window |
-| `band(material, quotes, date, asOf)` | `{established, low, high, p25, p75, median, n}` |
+| `band(material, quotes, date, asOf)` | `{established, low, high, p25, p75, median, n}` plus `p25_pct` / `p75_pct` — the quartiles are computed on premium **as a share of driver cost** and returned in money at the day's cost |
 | `position(price, band)` / `outside(price, band)` | `"below"`/`"inside"`/`"above"`/`"unknown"`, and the distance |
 | `budgetGap(material, price)` | `{budget, amount, pct, over}` or `null` |
 | `premiumSeries(...)` / `premiumTrend(...)` | the history chart, and the quarterly run of widening |
@@ -297,6 +301,14 @@ price, because the cheaper tonne is the good outcome on a buying desk.
 
 Below **four** observations there is no band at all: quartiles of three numbers describe
 noise, and somebody would negotiate against them.
+
+The band is a **share**, not a sum of money, and that is load-bearing. Crude ran 70% across
+one of these twelve-month windows; a supplier steady at 4% over cost therefore showed a
+premium of ₱2,400 in January and ₱3,400 in October, and money-percentiles across both
+describe *when* a quote was made rather than who made it — every recent quote then prints
+above a band dragged down by the old ones. `tools/lib_tests.js` has the regression: driver
+cost doubles across the window while every supplier holds 10%, and the latest quote has to
+come back `inside`.
 
 ### `GD.spendlib` — also pure, also tested
 
@@ -327,6 +339,8 @@ generated documents) / `GD.printableFrame(title, html)` (the laid-out page, insp
 
 `GD.chart.line` takes four optional extras, all of them additive and all off by default:
 
+`GD.chart.line` takes five optional extras, all additive and all off by default:
+
 | Option | Does |
 | --- | --- |
 | `fmtX` | labels the x axis. The default is right for a chart spanning weeks and wrong for one spanning a year, where "1 Oct" at both ends names two different Octobers |
@@ -334,6 +348,12 @@ generated documents) / `GD.printableFrame(title, html)` (the laid-out page, insp
 | `baseline` | a dashed horizontal at a value, for "above or below where this window opened" |
 | `onHover(idx, date)` / `onLeave()` | the scrubbed point, for a caller drawing its own readout |
 | `tip: false` | suppresses the built-in tooltip, which a caller using `onHover` does not want twice |
+
+`GD.chart.candles({bars, baseline, fmtY, fmtX, onHover, onLeave, tip})` draws what it is given
+and does **not** resample: `bars` is `[[date, o, h, l, c], …]` at whatever interval the caller
+chose, because only the caller knows how many candles fit. `GD.chart.aggregate(bars, "w"|"m")`
+does the rolling up. Candle direction is the buyer's, like everything else: a session that
+closed lower is emerald.
 
 ## Checks
 
@@ -344,5 +364,6 @@ py -3.11 tools/test_app.py        # every route renders clean
 py -3.11 tools/test_flows.py      # the four flows, driven through the real DOM
 py -3.11 tools/shots.py           # screenshots of the states worth looking at
 py -3.11 tools/dump.py bulletin   # print a generated document, to read it
-py -3.11 tools/fetch_barchart.py --dry-run   # the feed-to-symbol mapping
+py -3.11 tools/fetch_prices.py    # real daily OHLC into the build cache
+py -3.11 tools/fetch_prices.py --clear       # back to generated paths
 ```

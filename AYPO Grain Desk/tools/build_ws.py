@@ -42,17 +42,48 @@ OUT_SAMPLE_JS = ROOT / "app" / "js" / "spend_sample.js"
 OUT_SAMPLE_CSV = ROOT / "app" / "data" / "spend_sample.csv"
 OUT_SAMPLE_XLSX = ROOT / "app" / "data" / "spend_sample.xlsx"
 
-AS_OF = "2026-10-13"
+# ------------------------------------------------------------------ real prices, maybe
+# tools/fetch_prices.py leaves real daily OHLC here. When it is present the exchange-traded
+# feeds, the FX table and the dataset's "today" come from it; everything else - the suppliers,
+# the quotes, the spend - stays generated, because it is a fictional company's book. Delete
+# the cache and the whole dataset goes back to being synthetic.
+PRICE_CACHE = ROOT / "tools" / "price_cache.json"
+REAL = {}
+if PRICE_CACHE.exists():
+    REAL = json.loads(PRICE_CACHE.read_text(encoding="utf-8"))
+
 SEED = 20261013
-BU_PER_T = 36.7437
+BU_PER_T = 36.7437          # bushels per tonne, wheat
 
-# Month anchors: 13 points, 2025-10-01 .. 2026-10-01. A quote dated the 10th of a month reads
+
+def _last_real_date():
+    """The last day every real feed has a bar for. Anything later and one series would end
+    short, which draws as a feed that stopped printing."""
+    ends = [f["bars"][-1][0] for f in REAL.get("feeds", {}).values() if f.get("bars")]
+    return min(ends) if ends else None
+
+
+AS_OF = _last_real_date() or "2026-10-13"
+
+
+def _months_ending(as_of, n=13):
+    """`n` month starts, the last being the month `as_of` falls in."""
+    y, m = int(as_of[:4]), int(as_of[5:7])
+    out = []
+    for back in range(n - 1, -1, -1):
+        yy, mm = y, m - back
+        while mm <= 0:
+            mm += 12
+            yy -= 1
+        out.append("%04d-%02d-01" % (yy, mm))
+    return out
+
+
+# Month anchors: 13 points ending in the month of AS_OF. A quote dated inside a month reads
 # that month's anchor, so every figure on screen traces to one published monthly print.
-MONTHS = ["2025-10-01", "2025-11-01", "2025-12-01", "2026-01-01", "2026-02-01", "2026-03-01",
-          "2026-04-01", "2026-05-01", "2026-06-01", "2026-07-01", "2026-08-01", "2026-09-01",
-          "2026-10-01"]
+MONTHS = _months_ending(AS_OF)
 
-# Quotes and spend cover the trailing 12 months: Nov 2025 .. Oct 2026.
+# Quotes and spend cover the trailing 12 months.
 QUOTE_MONTHS = MONTHS[1:]
 
 
@@ -63,14 +94,38 @@ def r2(v):
 
 
 # --------------------------------------------------------------------------------- fx
-# Indicative mid rates on 2026-10-13. Mocked, and labelled as such in the payload.
-FX = {
+# Indicative mids. Real when tools/price_cache.json has them, and generated otherwise - the
+# payload carries a note saying which, and every screen that converts prints it.
+_FX_FALLBACK = {
     "USD": {"USD": 1.0, "PHP": 58.20, "THB": 33.02, "EUR": 0.9180, "MYR": 4.460},
     "PHP": {"PHP": 1.0, "USD": 1.0 / 58.20},
     "EUR": {"EUR": 1.0, "PHP": 63.40, "USD": 1.0893},
     "MYR": {"MYR": 1.0, "PHP": 13.05, "USD": 0.2242},
     "THB": {"THB": 1.0, "PHP": 1.7626, "USD": 1.0 / 33.02},
 }
+
+
+def build_fx():
+    rates = REAL.get("fx") or {}
+    need = ("USDPHP", "EURPHP", "MYRPHP", "EURUSD", "USDMYR")
+    if not all(k in rates for k in need):
+        return _FX_FALLBACK, False
+    usdphp = rates["USDPHP"]["rate"]
+    eurphp = rates["EURPHP"]["rate"]
+    myrphp = rates["MYRPHP"]["rate"]
+    eurusd = rates["EURUSD"]["rate"]
+    usdmyr = rates["USDMYR"]["rate"]
+    return {
+        "USD": {"USD": 1.0, "PHP": usdphp, "EUR": 1.0 / eurusd, "MYR": usdmyr,
+                "THB": 33.02},
+        "PHP": {"PHP": 1.0, "USD": 1.0 / usdphp},
+        "EUR": {"EUR": 1.0, "PHP": eurphp, "USD": eurusd},
+        "MYR": {"MYR": 1.0, "PHP": myrphp, "USD": 1.0 / usdmyr},
+        "THB": {"THB": 1.0, "PHP": usdphp / 33.02, "USD": 1.0 / 33.02},
+    }, True
+
+
+FX, FX_IS_REAL = build_fx()
 
 
 # ------------------------------------------------------------------------- series maker
@@ -142,15 +197,60 @@ FEEDS = [
 # Daily points across the thirteen monthly anchors: 2025-10-01 to 2026-10-13.
 DAILY_DAYS = 378
 
-# Feeds with no licensed source behind them in this build. Labelled wherever they
-# appear, on screen and in every generated document.
-MOCKED_FEEDS = ("POTEU", "KRAFT", "BOPP", "FRTBULK", "FRTBOX", "USDPHP")
+# Whether a feed is "mocked" is no longer a list to maintain: it is whether a real series
+# came back for it. See is_real().
+
+# How each material's FY26 rate sits against its own fair price at the last review: a little
+# over where procurement built in headroom, a little under where the business squeezed. This
+# is the only hand-set number in the budget, and it is what makes some materials run over and
+# others under rather than all of them moving together.
+BUDGET_FACTOR = {
+    "potato_flakes": 1.020,
+    "green_coffee":  0.975,
+    "pet_resin":     1.045,
+    "refined_sugar": 0.990,
+    "palm_olein":    1.030,
+    "wheat_flour":   0.985,
+    "lam_film":      1.010,
+    "cartons":       1.020,
+}
+
+# Premium a material's book typically carries, used to turn driver cost into a fair price at
+# review time. Derived from PREMIUM below rather than guessed twice.
+def typical_premium(material_id):
+    vals = [base for (mid, _sup), (base, _drift) in PREMIUM.items() if mid == material_id]
+    return sum(vals) / len(vals) if vals else 0.04
+
+
+def round_rate(v):
+    """Budget rates are round numbers on a planning sheet, not four significant figures."""
+    if v >= 10000:
+        return float(round(v / 500.0) * 500)
+    if v >= 1000:
+        return float(round(v / 100.0) * 100)
+    if v >= 100:
+        return float(round(v))
+    return float(round(v * 2) / 2)
+
+
+def set_budgets(materials):
+    """Set each FY26 rate from the fair price at the last review, times the material's factor.
+
+    The review is the current month: a budget rate that a buyer is being measured against
+    today was set against a market they could see, and anchoring it a year back would make
+    every material run over budget together, which says nothing about any of them.
+    """
+    review = len(MONTHS) - 1
+    for m in materials:
+        fair = driver_cost(m, review) * (1 + typical_premium(m["id"]))
+        m["budget_price"] = round_rate(fair * BUDGET_FACTOR[m["id"]])
+
 
 MATERIALS = [
     # id, name, category, unit, currency, budget, budget_note, crop feed, drivers
     {
         "id": "potato_flakes", "name": "Potato flakes", "category": "raw",
-        "unit": "MT", "currency": "PHP", "budget_price": 118000.0,
+        "unit": "MT", "currency": "PHP", "budget_price": None,  # set by set_budgets()
         "budget_note": "FY26 budget rate, set at the Nov 2025 planning round",
         "crop": {"status": "unavailable",
                  "reason": "The European crop circular we read for potato has not published "
@@ -164,7 +264,7 @@ MATERIALS = [
     },
     {
         "id": "green_coffee", "name": "Green coffee, robusta gr.2", "category": "raw",
-        "unit": "MT", "currency": "PHP", "budget_price": 262000.0,
+        "unit": "MT", "currency": "PHP", "budget_price": None,  # set by set_budgets()
         "budget_note": "FY26 budget rate, held since the Q2 re-forecast",
         "crop": {"status": "ok", "headline": "Vietnamese harvest starts late October",
                  "body": "Trade estimates for the 2026/27 Vietnamese crop sit a little above "
@@ -180,7 +280,7 @@ MATERIALS = [
     },
     {
         "id": "pet_resin", "name": "PET resin, bottle grade", "category": "packaging",
-        "unit": "MT", "currency": "PHP", "budget_price": 61500.0,
+        "unit": "MT", "currency": "PHP", "budget_price": None,  # set by set_budgets()
         "budget_note": "FY26 budget rate, set against a USD 70/bbl crude assumption",
         "crop": None,
         "drivers": [
@@ -193,7 +293,7 @@ MATERIALS = [
     },
     {
         "id": "refined_sugar", "name": "Refined sugar", "category": "raw",
-        "unit": "MT", "currency": "PHP", "budget_price": 51000.0,
+        "unit": "MT", "currency": "PHP", "budget_price": None,  # set by set_budgets()
         "budget_note": "FY26 budget rate, set at the Nov 2025 planning round",
         "crop": {"status": "ok", "headline": "Milling season opened on schedule",
                  "body": "Negros mills opened in the first week of September. Cane tonnage "
@@ -211,7 +311,7 @@ MATERIALS = [
     },
     {
         "id": "palm_olein", "name": "Refined palm olein", "category": "raw",
-        "unit": "MT", "currency": "PHP", "budget_price": 66000.0,
+        "unit": "MT", "currency": "PHP", "budget_price": None,  # set by set_budgets()
         "budget_note": "FY26 budget rate, re-set in May 2026 after the CPO rally",
         "crop": {"status": "ok", "headline": "Malaysian stocks building into Q4",
                  "body": "Output in Peninsular Malaysia has been seasonally strong. Stock "
@@ -230,7 +330,7 @@ MATERIALS = [
     },
     {
         "id": "wheat_flour", "name": "Hard wheat flour", "category": "raw",
-        "unit": "MT", "currency": "PHP", "budget_price": 30500.0,
+        "unit": "MT", "currency": "PHP", "budget_price": None,  # set by set_budgets()
         "budget_note": "FY26 budget rate, set at the Nov 2025 planning round",
         "crop": {"status": "ok", "headline": "Northern hemisphere harvest complete",
                  "body": "The US and EU harvests are in. Attention has moved to southern "
@@ -246,7 +346,7 @@ MATERIALS = [
     },
     {
         "id": "lam_film", "name": "Laminated film, BOPP/PET", "category": "packaging",
-        "unit": "kg", "currency": "PHP", "budget_price": 152.0,
+        "unit": "kg", "currency": "PHP", "budget_price": None,  # set by set_budgets()
         "budget_note": "FY26 budget rate per kg, set at the Nov 2025 planning round",
         "crop": None,
         "drivers": [
@@ -260,7 +360,7 @@ MATERIALS = [
     },
     {
         "id": "cartons", "name": "Corrugated cartons", "category": "packaging",
-        "unit": "MT", "currency": "PHP", "budget_price": 51500.0,
+        "unit": "MT", "currency": "PHP", "budget_price": None,  # set by set_budgets()
         "budget_note": "FY26 budget rate, set at the Nov 2025 planning round",
         "crop": None,
         "drivers": [
@@ -382,40 +482,135 @@ JUNK = [
 
 
 # ========================================================================== driver series
+def real_bars(key):
+    """The real daily bars for a feed, from either half of the cache. The FX pairs are
+    fetched as rates but they are instruments too, and USD/PHP is the feed with the widest
+    reach on this book, so it gets a chart like everything else."""
+    f = (REAL.get("feeds") or {}).get(key)
+    if f and f.get("bars"):
+        return f["bars"], f
+    x = (REAL.get("fx") or {}).get(key)
+    if x and x.get("bars"):
+        return x["bars"], x
+    return None, None
+
+
+def is_real(key):
+    return real_bars(key)[0] is not None
+
+
+def in_window(bars):
+    """Only the bars inside the dataset's twelve months. The fetch asks for two years so the
+    month anchors at the start of the window have a prior print to settle on."""
+    return [b for b in bars if MONTHS[0] <= b[0] <= AS_OF]
+
+
+def monthly_from_bars(bars):
+    """The close in force on each month anchor: the last session at or before it. Not an
+    average and not the first of the month - the anchor is a print that happened."""
+    out, at = [], 0
+    for anchor in MONTHS:
+        last = None
+        while at < len(bars) and bars[at][0] <= anchor:
+            last = bars[at][4]
+            at += 1
+        if last is None:
+            last = bars[0][4] if bars else 0.0
+            at = 0
+        out.append(round(last, 4))
+    # The final anchor is the month the dataset ends in; carry the latest close onto it so
+    # the price model and the chart finish on the same number.
+    if bars:
+        out[-1] = round(bars[-1][4], 4)
+    return out
+
+
+def synth_ohlc(rng, closes, dates):
+    """An open, high and low around a generated close, so a candle has something to draw.
+
+    Nothing is claimed by this: it is a session's shape invented around a level that was
+    itself invented, and the screen says both. Real feeds never come through here.
+    """
+    out = []
+    prev = closes[0]
+    for i, c in enumerate(closes):
+        o = prev
+        span = abs(c) * (0.0015 + abs(rng.gauss(0, 0.0022)))
+        hi = max(o, c) + span * (0.4 + rng.random())
+        lo = min(o, c) - span * (0.4 + rng.random())
+        out.append([dates[i], round(o, 4), round(hi, 4), round(lo, 4), round(c, 4)])
+        prev = c
+    return out
+
+
 def build_series(rng):
-    """Every monthly series in the workspace, keyed by feed key."""
+    """Every monthly series in the workspace, keyed by feed key.
+
+    Real where the cache has it: the monthly anchors become the closes that actually printed
+    on those dates, so the price model argues a quote against a real published number.
+    """
     series = {}
     for key, label, venue, unit, cur, last, drift, vol, _role, _strip in FEEDS:
-        series[key] = {
-            "key": key, "label": label, "source": venue, "unit": unit, "currency": cur,
-            "dates": MONTHS[:], "values": walk(rng, last, drift, vol),
-        }
+        bars, meta = real_bars(key)
+        if bars:
+            bars = in_window(bars)
+            # US cents on the exchange tape ("USX") are still dollars for conversion; the
+            # unit string already says cents and the per_unit on each driver expects them.
+            real_cur = (meta.get("currency") or cur)
+            cur = "USD" if real_cur in ("USX", "USD") else real_cur
+            if key == "FCPO":
+                # Yahoo's long name for this contract runs to "...Calendar" and gets cut off
+                # in a tile. The contract is what matters; name it plainly.
+                label, unit = "Malaysian crude palm oil", "USD/MT"
+            series[key] = {
+                "key": key, "label": label, "source": venue, "unit": unit, "currency": cur,
+                "dates": MONTHS[:], "values": monthly_from_bars(bars),
+                "bars": bars, "real": True,
+                "symbol": meta.get("symbol"), "provider": meta.get("provider", "yahoo"),
+            }
+        else:
+            series[key] = {
+                "key": key, "label": label, "source": venue, "unit": unit, "currency": cur,
+                "dates": MONTHS[:], "values": walk(rng, last, drift, vol),
+                "bars": None, "real": False,
+            }
     return series
 
 
 def build_instruments(rng, series):
     """One instrument per feed, in the shape `app.js` and `surfaces/prices.js` render.
 
-    `history` is a daily path interpolated across the monthly anchors. The anchors are the
-    levels; the path between them is generated, `synthetic_history` says so, and every screen
-    that draws it repeats that in words.
+    A real feed carries the sessions that actually traded. A generated one carries a daily
+    path interpolated across its monthly anchors, with an invented session shape around each
+    close so the candles have something to draw; `synthetic_history` says which is which and
+    every screen repeats it in words.
     """
     out = []
     for key, label, venue, unit, cur, last, drift, vol, role, strip in FEEDS:
-        monthly = series[key]["values"]
-        hist = daily_from_monthly(rng, monthly, DAILY_DAYS)
-        dates = daily_dates(len(hist))
+        sr = series[key]
+        if sr.get("real"):
+            bars = sr["bars"]
+            hist = [b[4] for b in bars]
+            dates = [b[0] for b in bars]
+            ohlc = bars
+        else:
+            hist = daily_from_monthly(rng, sr["values"], DAILY_DAYS)
+            dates = daily_dates(len(hist))
+            ohlc = synth_ohlc(rng, hist, dates)
         prev = hist[-2] if len(hist) > 1 else hist[-1]
         out.append({
-            "key": key, "label": label, "venue": venue, "unit": unit,
-            "currency": cur, "role": role, "strip": strip,
+            "key": key, "label": sr["label"], "venue": venue,
+            "unit": sr["unit"], "currency": sr["currency"],
+            "role": role, "strip": strip,
             "last": round(hist[-1], 4), "prev": round(prev, 4),
             "change": round(hist[-1] - prev, 4),
             "change_pct": round((hist[-1] / prev - 1) * 100, 3) if prev else 0.0,
-            "history": hist, "dates": dates,
-            "month_ago": round(monthly[-2], 4),
+            "history": hist, "dates": dates, "ohlc": ohlc,
+            "month_ago": round(sr["values"][-2], 4),
             "usd_mt": None,
-            "synthetic_history": True,
+            "synthetic_history": not sr.get("real"),
+            "symbol": sr.get("symbol"),
+            "provider": sr.get("provider"),
         })
     return out
 
@@ -435,7 +630,7 @@ def driver_for(spec, series):
         mocked = True
     else:
         s = series[key]
-        mocked = key in MOCKED_FEEDS
+        mocked = not is_real(key)
     return {
         "key": key,
         "name": s["label"],
@@ -475,6 +670,7 @@ def build_urc(rng):
         m = dict(spec)
         m["drivers"] = [driver_for(d, series) for d in spec["drivers"]]
         materials.append(m)
+    set_budgets(materials)
     by_id = {m["id"]: m for m in materials}
 
     # The supplier master holds the legal name and nothing else, which is the honest starting
@@ -824,8 +1020,24 @@ def main():
         # keeping and worth nothing on screen.
         "ui_workspace": "urc",
         "fx": FX,
-        "fx_note": "Indicative mid rates on " + AS_OF + ". Mocked for this build — no live "
-                   "feed is wired up, and every screen that converts says so.",
+        "fx_note": ("Mid rates on " + AS_OF + ", pulled from "
+                    + (REAL.get("provider") or "?") + " by tools/fetch_prices.py."
+                    if FX_IS_REAL else
+                    "Indicative mid rates on " + AS_OF + ". Generated for this build \u2014 no "
+                    "feed is wired up, and every screen that converts says so."),
+        # What is real here and what is not, assembled from what actually came back rather
+        # than written down once and left to rot. Every screen that labels the workspace
+        # reads this instead of asserting that the whole thing is invented.
+        "provenance": {
+            "real_feeds": sorted(set(list((REAL.get("feeds") or {}).keys())
+                                     + [k for k in (REAL.get("fx") or {}) if k == "USDPHP"])),
+            "fx_real": FX_IS_REAL,
+            "provider": REAL.get("provider"),
+            "fetched": REAL.get("fetched"),
+            "real": "Commodity, FX and freight prices wherever a public market exists for them",
+            "generated": "The company, its plants, its suppliers, every quote, every spend "
+                         "line, and the index levels for feeds with no public market",
+        },
         "workspaces": [
             {
                 "key": "ufm",
@@ -910,12 +1122,17 @@ def check(materials, by_id, quotes):
     latest_idx = len(MONTHS) - 1
 
     def premiums_for(mid):
+        """Premium as a share of driver cost, matching P.band in app/js/pricing.js. In money
+        it would describe when a quote was made rather than who made it, because the
+        underlying moves."""
         out = []
         for q in quotes:
             if q["material_id"] != mid:
                 continue
             idx = MONTHS.index(q["date"][:8] + "01")
-            out.append(q["price"] - driver_cost(by_id[mid], idx))
+            dc = driver_cost(by_id[mid], idx)
+            if dc:
+                out.append((q["price"] - dc) / dc)
         return sorted(out)
 
     # 1 · the coffee story — Kalinga's premium widens three quarters running, and the latest
@@ -941,7 +1158,7 @@ def check(materials, by_id, quotes):
 
     ps = premiums_for("green_coffee")
     dc = driver_cost(by_id["green_coffee"], latest_idx)
-    coffee_hi = dc + percentile(ps, 0.75)
+    coffee_hi = dc * (1 + percentile(ps, 0.75))
     last_kal = kal[-1]
     assert last_kal["price"] > coffee_hi, "latest coffee quote is not above the band"
 
@@ -950,7 +1167,7 @@ def check(materials, by_id, quotes):
     res.sort(key=lambda q: q["date"])
     ps = premiums_for("pet_resin")
     dc = driver_cost(by_id["pet_resin"], latest_idx)
-    lo, hi = dc + percentile(ps, 0.25), dc + percentile(ps, 0.75)
+    lo, hi = dc * (1 + percentile(ps, 0.25)), dc * (1 + percentile(ps, 0.75))
     last_res = res[-1]
     assert lo <= last_res["price"] <= hi, "latest resin quote is not inside the band"
     assert last_res["price"] < by_id["pet_resin"]["budget_price"], "resin quote is not under budget"
@@ -963,7 +1180,7 @@ def check(materials, by_id, quotes):
             continue
         dc = driver_cost(m, latest_idx)
         ps = premiums_for(m["id"])
-        fair = dc + percentile(ps, 0.5)
+        fair = dc * (1 + percentile(ps, 0.5))
         gap = (m["budget_price"] - fair) / fair
         assert dc < m["budget_price"], (
             "%s budget %.0f is below its driver cost %.0f" % (m["id"], m["budget_price"], dc))

@@ -61,8 +61,9 @@
   GD.supplierName = function (id, ws) { var s = GD.supplier(id, ws); return s ? s.name : id; };
 
   /* --------------------------------------------------------------------------------- fx
-     One table, mocked, declared once in the payload. Every conversion on every screen comes
-     through here so there is exactly one rate to argue with. */
+     One table, declared once in the payload and real when the build pulled it. Every
+     conversion on every screen comes through here, so there is exactly one rate to argue
+     with and `fxNote()` says where it came from. */
 
   GD.fxTable = function () { return W.fx || {}; };
   GD.fxNote = function () { return W.fx_note || ""; };
@@ -136,16 +137,32 @@
   };
 
   /* ------------------------------------------------------------------------ demo label
-     The URC workspace is invented from end to end. Every surface that renders it says so in
-     the same words rather than each one inventing its own disclaimer. */
+     What this workspace actually is depends on what the build pulled: an invented company
+     and an invented supplier book, on top of real market prices wherever a public market
+     exists for them. One label, read off the payload's provenance, so no screen has to
+     invent its own disclaimer and none of them can drift out of date. */
 
   GD.demoChip = function () {
     if (!active || !active.demo) return null;
-    var c = GD.chip("Demo data", "warn", "alert");
-    GD.tipOn(c, "<b>Every figure in this workspace is invented</b><div class='tip-mute'>" +
-      "Suppliers, materials, prices, spend lines and index levels are all fictional, " +
-      "generated for this demonstration. Nothing here came from a customer.</div>");
+    var pv = W.provenance || {};
+    var n = (pv.real_feeds || []).length;
+    /* The label has to be true of whatever actually got built. With real prices pulled it is
+       half a demo, and claiming every figure is invented would be as wrong as claiming none
+       of them are. */
+    var c = GD.chip(n ? "Demo book, live prices" : "Demo data", "warn", "alert");
+    GD.tipOn(c, n
+      ? "<b>Real prices, invented book</b><div class='tip-mute'>" +
+        GD.esc(pv.real) + " — " + n + " feed" + (n === 1 ? "" : "s") +
+        (pv.provider ? " via " + GD.esc(pv.provider) : "") +
+        (pv.fetched ? ", pulled " + GD.esc(pv.fetched) : "") + ".</div>" +
+        "<div class='tip-mute'>Invented: " + GD.esc(pv.generated) + ". Feeds with no public " +
+        "market are labelled on every screen they appear.</div>"
+      : "<b>Every figure in this workspace is invented</b><div class='tip-mute'>" +
+        "Suppliers, materials, prices, spend lines and index levels are all fictional, " +
+        "generated for this demonstration. Nothing here came from a customer.</div>");
     return c;
   };
+
+  GD.provenance = function () { return W.provenance || {}; };
 
 })();

@@ -16,20 +16,21 @@
    outcome. The app has read that way since its first screen; flipping it here would be the
    one place it lied.
 
-   Where the numbers come from: the levels are the monthly prints the price model reads, and
-   the daily path between them is generated for this build. The page says so rather than
-   implying a tick feed. `tools/fetch_barchart.py` replaces the generated path with real
-   closes at build time for anyone with an OnDemand key. */
+   Where the numbers come from: `tools/fetch_prices.py` pulls real daily sessions for the
+   feeds that have a public market, and the rest — assessed indices, private freight
+   assessments — keep a generated path with an invented session shape so the candles have
+   something to draw. Every feed says which it is, on the tile, in the header and in the
+   footer under the chart. */
 (function () {
   "use strict";
 
   var el = GD.el, icon = GD.icon, fmt = GD.fmt, P = GD.pricing;
 
   var WINDOWS = [
-    { key: "1M", label: "1M", days: 30, say: "past month" },
-    { key: "3M", label: "3M", days: 91, say: "past three months" },
-    { key: "6M", label: "6M", days: 182, say: "past six months" },
-    { key: "1Y", label: "1Y", days: 9999, say: "past twelve months" }
+    { key: "1M", label: "1M", days: 30, say: "past month", candle: "d", grain: "daily" },
+    { key: "3M", label: "3M", days: 91, say: "past three months", candle: "d", grain: "daily" },
+    { key: "6M", label: "6M", days: 182, say: "past six months", candle: "w", grain: "weekly" },
+    { key: "1Y", label: "1Y", days: 9999, say: "past twelve months", candle: "w", grain: "weekly" }
   ];
 
   function kindColor(kind) {
@@ -103,7 +104,10 @@
         if (ins.role !== "fx") return;
         f = byKey[ins.key] = {
           key: ins.key, name: ins.label, source: ins.venue, unit: ins.unit,
-          currency: ins.currency, kind: "fx", mocked: true,
+          currency: ins.currency, kind: "fx",
+          /* Whether this is a placeholder is a fact about the build, not a constant: the
+             rate is real whenever tools/fetch_prices.py pulled one. */
+          mocked: !!ins.synthetic_history,
           note: "Every leg published in another currency is converted at this rate.",
           months: [], monthly: [],
           materials: (ws.materials || []).filter(function (m) {
@@ -114,9 +118,13 @@
       }
       f.values = ins.history;
       f.dates = ins.dates;
+      f.ohlc = ins.ohlc || null;
       f.last = ins.last;
       f.strip = !!ins.strip;
       f.synthetic = !!ins.synthetic_history;
+      f.symbol = ins.symbol || null;
+      f.provider = ins.provider || null;
+      f.mocked = !!ins.synthetic_history;
     });
 
     out.forEach(function (f) {
@@ -126,6 +134,7 @@
         f.dates = f.months;
         f.last = f.monthly[f.monthly.length - 1];
       }
+      f.hasCandles = !!(f.ohlc && f.ohlc.length);
       var v = f.values;
       f.first = v[0];
       f.year = f.first ? (f.last - f.first) / f.first : null;
@@ -151,8 +160,9 @@
     var dates = f.dates.slice(n - take);
     var open = values[0], last = values[values.length - 1];
     var sorted = values.slice().sort(function (a, b) { return a - b; });
+    var bars = f.ohlc ? f.ohlc.slice(f.ohlc.length - Math.min(f.ohlc.length, take)) : null;
     return {
-      values: values, dates: dates, open: open, last: last,
+      values: values, dates: dates, open: open, last: last, bars: bars,
       high: sorted[sorted.length - 1], low: sorted[0],
       change: last - open,
       pct: open ? (last - open) / open : null
@@ -245,7 +255,7 @@
 
   /* ============================================================== the instrument */
 
-  function instrumentCard(f, ws, state, onWindow) {
+  function instrumentCard(f, ws, state, onWindow, onChart) {
     var win = WINDOWS.filter(function (w) { return w.key === state.window; })[0] || WINDOWS[2];
     var s = slice(f, win);
     var tone = s.change < 0 ? "var(--down)" : s.change > 0 ? "var(--up)" : "var(--ink-3)";
@@ -279,24 +289,47 @@
       paint(s.values[idx], s.values[idx] - s.open,
         fmt.date(s.dates[idx]) + " · against " + num(s.open) + " on " + fmt.date(s.dates[0]));
     }
+    /* Scrubbing a candle reads the whole session, because that is what a candle is. */
+    function showSession(bar) {
+      paint(bar[4], bar[4] - s.open,
+        fmt.date(bar[0]) + " · O " + num(bar[1]) + "  H " + num(bar[2]) +
+        "  L " + num(bar[3]) + "  C " + num(bar[4]));
+    }
     function showLatest() {
       paint(s.last, s.change, win.say + " · " + f.unit);
     }
     showLatest();
 
-    var chart = GD.chart.line({
-      series: [{ name: f.name, values: s.values, color: tone, weight: 2 }],
-      dates: s.dates,
-      w: 1000, h: 290,
-      area: true,
-      baseline: s.open,
-      tip: false,
-      onHover: showPoint,
-      onLeave: showLatest,
-      fmtY: num,
-      fmtX: win.days > 200 ? axisDate : fmt.dateShort,
-      label: f.name + ", " + win.say
-    });
+    var useCandles = state.chart === "candles" && f.hasCandles;
+    var candleBars = useCandles ? GD.chart.aggregate(s.bars, win.candle) : null;
+    var chart;
+    if (useCandles) {
+      chart = GD.chart.candles({
+        bars: candleBars,
+        w: 1000, h: 290,
+        baseline: s.open,
+        tip: false,
+        onHover: function (idx, bar) { showSession(bar); },
+        onLeave: showLatest,
+        fmtY: num,
+        fmtX: win.days > 200 ? axisDate : fmt.dateShort,
+        label: f.name + ", " + win.say + ", " + win.grain + " candles"
+      });
+    } else {
+      chart = GD.chart.line({
+        series: [{ name: f.name, values: s.values, color: tone, weight: 2 }],
+        dates: s.dates,
+        w: 1000, h: 290,
+        area: true,
+        baseline: s.open,
+        tip: false,
+        onHover: showPoint,
+        onLeave: showLatest,
+        fmtY: num,
+        fmtX: win.days > 200 ? axisDate : fmt.dateShort,
+        label: f.name + ", " + win.say
+      });
+    }
     chart.classList.add("chart-reveal");
 
     var head = el("div", {
@@ -342,9 +375,16 @@
         })(),
         bigPrice, changeLine, whenLine
       ]),
-      el("div", { style: { "margin-top": "2px", flex: "none" } }, [
+      el("div", {
+        style: { "margin-top": "2px", flex: "none", display: "grid", gap: "7px",
+                 "justify-items": "end" }
+      }, [
         GD.seg(WINDOWS.map(function (w) { return { key: w.key, label: w.label }; }),
-          win.key, onWindow)
+          win.key, onWindow),
+        f.hasCandles
+          ? GD.seg([{ key: "line", label: "Line" }, { key: "candles", label: "Candles" }],
+              state.chart, onChart)
+          : null
       ])
     ]);
 
@@ -376,9 +416,12 @@
       foot: [
         el("span", { style: { color: "var(--ink-3)" },
           text: f.synthetic
-            ? "The levels are the monthly prints the price model reads. The daily path " +
-              "between them is generated for this build, not a tick feed."
-            : "Daily closes from " + f.source + "." }),
+            ? "Generated for this build: the monthly levels are the prints the price model " +
+              "reads, and the path and sessions between them are invented, not a tick feed."
+            : (useCandles ? win.grain.charAt(0).toUpperCase() + win.grain.slice(1) +
+                " candles" : "Daily closes") + " — real market data" +
+              (f.symbol ? ", " + f.symbol : "") +
+              (f.provider ? " via " + f.provider : "") + "." }),
         el("span", { style: { flex: "1", "min-width": "0" } }),
         el("span", { class: "nowrap", style: { color: "var(--ink-3)" },
           text: "as of " + fmt.date(GD.wsAsOf()) })
@@ -611,7 +654,7 @@
       var widest = list.slice().sort(function (a, b) {
         return b.materials.length - a.materials.length;
       })[0];
-      var state = { feed: widest || list[0], window: "6M" };
+      var state = { feed: widest || list[0], window: "6M", chart: "line" };
 
       wrap.appendChild(el("div", { class: "page-head" }, [
         el("div", { class: "ph-text" }, [
@@ -642,6 +685,9 @@
         GD.clear(leftSlot);
         leftSlot.appendChild(instrumentCard(state.feed, ws, state, function (k) {
           state.window = k;
+          drawInstrument();
+        }, function (k) {
+          state.chart = k;
           drawInstrument();
         }));
       }

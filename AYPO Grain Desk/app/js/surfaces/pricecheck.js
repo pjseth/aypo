@@ -281,8 +281,9 @@
       var sups = {};
       band.obs.forEach(function (o) { sups[o.supplier_id] = true; });
       add("Fair band", price(band.low, m) + " – " + price(band.high, m) + per(m),
-        "25th–75th percentile of premium across " + band.n + " quotes from " +
-        Object.keys(sups).length + " suppliers of " + m.name + ", last 12 months",
+        "25th–75th percentile of premium over driver cost across " + band.n +
+        " quotes from " + Object.keys(sups).length + " suppliers of " + m.name +
+        ", last 12 months, applied to this month's driver cost",
         band.low);
       rows[rows.length - 1].value2 = band.high;
       add("Observations behind the band", band.n + " quotes from " +
@@ -959,10 +960,12 @@
             el("div", { style: { display: "grid", gap: "18px", "align-content": "start" } }, [
               section("Fair band", bandBar(a),
                 band.established
-                  ? "The band is the 25th to 75th percentile of the premium every supplier " +
-                    "of " + m.name + " has asked for over the last twelve months — " +
-                    band.n + " quotes — added to this month's driver cost. It is built from " +
-                    "our own quote history, not bought from anyone with a view on the answer."
+                  ? "The band is the 25th to 75th percentile of what every supplier of " +
+                    m.name + " has charged over driver cost across the last twelve months — " +
+                    band.n + " quotes — applied to this month's driver cost. It is a share " +
+                    "rather than a sum of money, because the underlying moves: a supplier " +
+                    "steady at 4% over cost should read as steady whatever crude did. Built " +
+                    "from our own quote history, not bought from anyone with a view on it."
                   : null),
               section("Against budget", budgetBlock)
             ])
@@ -1051,11 +1054,14 @@
               "premium = quote − driver cost"),
             methodStep(3, "The band",
               "Every quote for the material from every supplier over the last twelve months " +
-              "gives one premium. The 25th and 75th percentiles of that population, added " +
-              "to this month's driver cost, are the band. Below four observations there is " +
-              "no band at all — quartiles of three numbers describe noise, and somebody " +
-              "would negotiate against them.",
-              "band = driver cost + [p25, p75] of the material's premiums"),
+              "gives one premium, taken as a share of that month's driver cost. The 25th and " +
+              "75th percentiles of those shares, applied to this month's driver cost, are " +
+              "the band. A share and not a sum of money, because the underlying moves — " +
+              "crude ran 70% across one of these windows, and a supplier steady at 4% over " +
+              "cost has to read as steady rather than as a widening premium. Below four " +
+              "observations there is no band at all: quartiles of three numbers describe " +
+              "noise, and somebody would negotiate against them.",
+              "band = driver cost × (1 + [p25, p75] of premium over cost)"),
             methodStep(4, "Budget",
               "Separate question, separate answer. The band says whether a premium is " +
               "normal; the budget rate says whether the business can afford the price. A " +

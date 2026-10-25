@@ -478,7 +478,152 @@
     return svg;
   }
 
-  GD.chart = { spark: spark, barSpark: barSpark, line: lineChart, groupedBars: groupedBars, niceMax: niceMax, extent: extent };
+  /* Candles. `bars` is [[date, open, high, low, close], …] already aggregated to whatever
+     interval the caller wants — this draws what it is given and does not resample, because
+     the caller is the only one who knows how many candles fit.
+
+     Direction is the buyer's, like everything else on this desk: a session that closed lower
+     is emerald, because the cheaper tonne is the good outcome. That is the opposite of a
+     trading screen and it is deliberate. */
+  function candles(opts) {
+    var bars = opts.bars || [];
+    var w = opts.w || 1000, h = opts.h || 290;
+    var padL = opts.padL === undefined ? 44 : opts.padL, padR = 12, padT = 10, padB = 24;
+    var all = [];
+    bars.forEach(function (b) { all.push(b[2], b[3]); });
+    var e = extent(all);
+    var lo = e[0] - (e[1] - e[0]) * 0.06;
+    var hi = e[1] + (e[1] - e[0]) * 0.06;
+    var n = bars.length;
+    var span = Math.max(1, w - padL - padR);
+    var step = n ? span / n : span;
+    var body = Math.max(1, Math.min(13, step * 0.62));
+    var X = function (i) { return padL + step * (i + 0.5); };
+    var Y = function (v) { return padT + (1 - (v - lo) / (hi - lo || 1)) * (h - padT - padB); };
+
+    var svg = svgEl("svg", {
+      viewBox: "0 0 " + w + " " + h, class: "chart",
+      role: "img", "aria-label": opts.label || "Candlestick chart"
+    });
+    var i, v, yy, t;
+    for (i = 0; i <= 4; i++) {
+      v = lo + (hi - lo) * (i / 4);
+      yy = Y(v);
+      svg.appendChild(svgEl("line", {
+        x1: padL, x2: w - padR, y1: yy.toFixed(2), y2: yy.toFixed(2), class: "grid-l"
+      }));
+      t = svgEl("text", { x: padL - 7, y: (yy + 3.2).toFixed(2), "text-anchor": "end", class: "axis-l" });
+      t.textContent = opts.fmtY ? opts.fmtY(v) : nf(v, 0);
+      svg.appendChild(t);
+    }
+    if (opts.baseline !== undefined && opts.baseline !== null) {
+      svg.appendChild(svgEl("line", {
+        x1: padL, x2: w - padR, y1: Y(opts.baseline).toFixed(2), y2: Y(opts.baseline).toFixed(2),
+        stroke: "var(--border-strong)", "stroke-width": 1, "stroke-dasharray": "4 4"
+      }));
+    }
+    var fmtX = opts.fmtX || fmtDateShort;
+    var xStep = Math.max(1, Math.floor(n / 6));
+    for (i = 0; i < n; i += xStep) {
+      t = svgEl("text", { x: X(i).toFixed(2), y: h - 7, "text-anchor": "middle", class: "axis-l" });
+      t.textContent = fmtX(bars[i][0]);
+      svg.appendChild(t);
+    }
+
+    var group = svgEl("g", {});
+    bars.forEach(function (b, idx) {
+      var o = b[1], hiV = b[2], loV = b[3], c = b[4];
+      var down = c < o;
+      var color = down ? "var(--down)" : c > o ? "var(--up)" : "var(--ink-3)";
+      var x = X(idx);
+      group.appendChild(svgEl("line", {
+        x1: x.toFixed(2), x2: x.toFixed(2),
+        y1: Y(hiV).toFixed(2), y2: Y(loV).toFixed(2),
+        stroke: color, "stroke-width": Math.max(1, Math.min(1.6, body * 0.18))
+      }));
+      var top = Y(Math.max(o, c)), bot = Y(Math.min(o, c));
+      group.appendChild(svgEl("rect", {
+        x: (x - body / 2).toFixed(2), y: top.toFixed(2),
+        width: body.toFixed(2), height: Math.max(1, bot - top).toFixed(2),
+        rx: Math.min(1.5, body / 4), fill: color
+      }));
+    });
+    svg.appendChild(group);
+
+    var cross = svgEl("line", {
+      x1: 0, x2: 0, y1: padT, y2: h - padB, stroke: "var(--border-strong)",
+      "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0
+    });
+    svg.appendChild(cross);
+    var hit = svgEl("rect", {
+      x: padL, y: padT, width: span, height: Math.max(0, h - padT - padB), fill: "transparent"
+    });
+    svg.appendChild(hit);
+
+    function at(ev) {
+      var r = svg.getBoundingClientRect();
+      if (!r.width || !n) return;
+      var px = (ev.clientX - r.left) / r.width * w;
+      var idx = Math.max(0, Math.min(n - 1, Math.floor((px - padL) / step)));
+      cross.setAttribute("x1", X(idx).toFixed(2));
+      cross.setAttribute("x2", X(idx).toFixed(2));
+      cross.setAttribute("opacity", 1);
+      if (opts.onHover) opts.onHover(idx, bars[idx]);
+      if (opts.tip !== false) {
+        var b = bars[idx];
+        var f = opts.fmtY || function (v) { return nf(v, 2); };
+        tip.show(ev, "<b>" + esc(fmtDate(b[0])) + "</b>" +
+          ["open", "high", "low", "close"].map(function (k, j) {
+            return "<div class='tip-row'><span class='tip-mute'>" + k + "</span><b>" +
+              esc(f(b[j + 1])) + "</b></div>";
+          }).join(""));
+      }
+    }
+    hit.addEventListener("pointermove", at);
+    hit.addEventListener("pointerleave", function () {
+      cross.setAttribute("opacity", 0);
+      tip.hide();
+      if (opts.onLeave) opts.onLeave();
+    });
+    return svg;
+  }
+
+  /* Roll daily bars up into weekly or monthly ones. Three hundred daily candles in a
+     thousand pixels are three hundred vertical lines; the caller picks the interval that
+     fits and this does the arithmetic. */
+  function aggregate(bars, interval) {
+    if (!interval || interval === "d") return bars.slice();
+    var out = [], cur = null, key = null;
+    bars.forEach(function (b) {
+      var k;
+      if (interval === "m") k = b[0].slice(0, 7);
+      else {
+        /* ISO-ish week bucket: the date of the Monday on or before this bar. */
+        var d = parseDate(b[0]);
+        if (!d) return;
+        var day = (d.getDay() + 6) % 7;
+        d.setDate(d.getDate() - day);
+        k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
+            String(d.getDate()).padStart(2, "0");
+      }
+      if (k !== key) {
+        if (cur) out.push(cur);
+        key = k;
+        cur = [b[0], b[1], b[2], b[3], b[4]];
+      } else {
+        cur[2] = Math.max(cur[2], b[2]);
+        cur[3] = Math.min(cur[3], b[3]);
+        cur[4] = b[4];
+      }
+    });
+    if (cur) out.push(cur);
+    return out;
+  }
+
+  GD.chart = {
+    spark: spark, barSpark: barSpark, line: lineChart, groupedBars: groupedBars,
+    candles: candles, aggregate: aggregate, niceMax: niceMax, extent: extent
+  };
 
   /* --------------------------------------------------------------- tooltip */
 

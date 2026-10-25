@@ -45,6 +45,36 @@ SCENARIOS = {
           }
         }
     """, 2600),
+    "market-candles": ("urc", "prices", """
+        var rows = document.querySelectorAll('.wrap .pal-item');
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i].textContent.indexOf('Brent') >= 0) { rows[i].click(); break; }
+        }
+        setTimeout(function () {
+          var b = document.querySelectorAll('.seg button');
+          for (var i = 0; i < b.length; i++) {
+            if (b[i].textContent === 'Candles') { b[i].click(); break; }
+          }
+        }, 450);
+    """, 3600),
+    "market-candles-3m": ("urc", "prices", """
+        var rows = document.querySelectorAll('.wrap .pal-item');
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i].textContent.indexOf('Brent') >= 0) { rows[i].click(); break; }
+        }
+        setTimeout(function () {
+          var b = document.querySelectorAll('.seg button');
+          for (var i = 0; i < b.length; i++) {
+            if (b[i].textContent === '3M') { b[i].click(); break; }
+          }
+          setTimeout(function () {
+            var c = document.querySelectorAll('.seg button');
+            for (var i = 0; i < c.length; i++) {
+              if (c[i].textContent === 'Candles') { c[i].click(); break; }
+            }
+          }, 350);
+        }, 450);
+    """, 4200),
     "market-coffee": ("urc", "prices", """
         var rows = document.querySelectorAll('.wrap .pal-item');
         for (var i = 0; i < rows.length; i++) {

@@ -182,27 +182,47 @@
   var MIN_OBS = 4;
   P.MIN_OBS = MIN_OBS;
 
+  /* The band is built on premium **as a share of driver cost**, then expressed in money at
+     the driver cost of the day being judged.
+
+     The obvious version — percentiles of the premium in money — is wrong whenever the
+     underlying has moved, and the underlying always moves. Crude ran up 40% across one of
+     these twelve-month windows; a supplier charging a steady 4% over cost therefore showed a
+     premium of ₱2,400 in January and ₱3,400 in October, and a band drawn across both is
+     describing *when* a quote was made rather than *who* made it. Every October quote then
+     prints above a band dragged down by January.
+
+     As a share, a steady supplier reads as steady, which is the thing a buyer is actually
+     trying to see. The band still comes out in money, so nothing above this changes. */
   P.band = function (material, quotes, date, asOf, months) {
     var obs = P.premiums(material, quotes, asOf || date, months);
     var cost = P.driverCost(material, date);
-    var vals = obs.map(function (o) { return o.premium; }).sort(function (a, b) { return a - b; });
-    if (vals.length < MIN_OBS || cost === null) {
+    var pcts = obs.map(function (o) { return o.pct; })
+      .filter(function (v) { return v !== null && v !== undefined; })
+      .sort(function (a, b) { return a - b; });
+    if (pcts.length < MIN_OBS || cost === null) {
       return {
-        established: false, n: vals.length, min_obs: MIN_OBS,
+        established: false, n: pcts.length, min_obs: MIN_OBS,
         driverCost: cost, low: null, high: null, p25: null, p75: null, obs: obs
       };
     }
-    var p25 = percentile(vals, 0.25), p75 = percentile(vals, 0.75);
+    var q25 = percentile(pcts, 0.25), q75 = percentile(pcts, 0.75);
+    var q50 = percentile(pcts, 0.5);
     return {
       established: true,
-      n: vals.length,
+      n: pcts.length,
       min_obs: MIN_OBS,
       driverCost: cost,
-      p25: round2(p25),
-      p75: round2(p75),
-      median: round2(percentile(vals, 0.5)),
-      low: round2(cost + p25),
-      high: round2(cost + p75),
+      /* The quartiles in money at this driver cost, which is how every screen reads them. */
+      p25: round2(cost * q25),
+      p75: round2(cost * q75),
+      median: round2(cost * q50),
+      /* …and as the shares they were actually computed from. */
+      p25_pct: q25,
+      p75_pct: q75,
+      median_pct: q50,
+      low: round2(cost * (1 + q25)),
+      high: round2(cost * (1 + q75)),
       obs: obs
     };
   };

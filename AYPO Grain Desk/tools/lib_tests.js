@@ -176,6 +176,35 @@
        P.outside(140, band));
     ok("inside the band is zero outside", P.outside(125, band) === 0);
 
+    /* The regression that real prices exposed: when the underlying moves, a band built on
+       the premium in money describes *when* a quote was made rather than who made it. Here
+       driver cost doubles across the window while every supplier charges a steady 10% over
+       it; a money-percentile band would put the latest quote far above its own top, and the
+       share-based one puts it exactly in the middle. */
+    var moving = {
+      id: "mv", unit: "MT", currency: "USD", budget_price: null,
+      drivers: [{ key: "A", name: "A", source: "s", unit: "USD/MT", currency: "USD",
+                  per_unit: 1, offset: 0, kind: "index",
+                  dates: ["2026-01-01", "2026-02-01", "2026-03-01", "2026-04-01",
+                          "2026-05-01", "2026-06-01"],
+                  values: [100, 120, 140, 160, 180, 200] }]
+    };
+    var steady = ["2026-01-01", "2026-02-01", "2026-03-01", "2026-04-01",
+                  "2026-05-01", "2026-06-01"].map(function (d, i) {
+      var cost = P.driverCost(moving, d, fx);
+      return { id: "s" + i, material_id: "mv", supplier_id: "sup" + i, date: d,
+               price: P.round2(cost * 1.10) };
+    });
+    var mb = P.band(moving, steady, "2026-06-01", "2026-06-01");
+    ok("a steady supplier reads as steady while the underlying doubles",
+       P.position(steady[steady.length - 1].price, mb) === "inside",
+       steady[steady.length - 1].price + " in " + mb.low + ".." + mb.high);
+    ok("the band is quoted at the latest driver cost, not an average of the window",
+       close(mb.driverCost, 200), mb.driverCost);
+    ok("the quartiles come back as shares as well as money",
+       close(mb.p25_pct, 0.10, 1e-6) && close(mb.p75_pct, 0.10, 1e-6),
+       mb.p25_pct + " / " + mb.p75_pct);
+
     var thin = P.band(m, qs.slice(0, 3), "2026-06-01", "2026-06-01");
     ok("three observations is not a band", !thin.established && thin.n === 3);
     ok("an unestablished band has no verdict", P.position(125, thin) === "unknown");

@@ -72,7 +72,11 @@
 
     var ws = GD.ws();
     ok("the dashboard opens on the demo book", ws.key === "urc", ws.key);
-    ok("the demo label is on the page", !!byText(".chip", "Demo data"));
+    /* The label says what the build actually is. With real prices pulled it reads "Demo
+       book, live prices"; with none it reads "Demo data". Both are the chip, and the
+       assertion is that the page is labelled at all, not which of the two it chose. */
+    ok("the workspace is labelled on the page",
+       !!byText(".chip", "Demo"), textOf(byText(".chip", "Demo")));
 
     var coffee = GD.material("green_coffee", ws);
     var live = GD.pricing.latestPerSupplier("green_coffee", ws.quotes).filter(function (q) {
@@ -227,8 +231,10 @@
        !!byText(".seg button", "6M") && !!byText(".seg button", "1Y"));
     ok("the window stats are on screen",
        page().indexOf("Window open") >= 0 && page().indexOf("12-month range") >= 0);
-    ok("the page says the daily path is generated",
-       page().indexOf("generated for this build") >= 0);
+    /* Some feeds have a real market behind them and some do not, and the page has to say
+       which it is looking at rather than one blanket caveat for both. */
+    ok("a feed with a real market names its source and symbol",
+       /real market data/.test(page()), (page().match(/real market data[^.]{0,40}/) || [""])[0]);
     ok("it says what the feed is worth inside each material",
        page().indexOf("inside each material") >= 0);
 
@@ -258,9 +264,45 @@
       ok("picking a feed swaps the instrument",
          page().indexOf("ICE Robusta coffee") >= 0);
       ok("and swaps its source with it", page().indexOf("ICE Europe") >= 0);
+      /* Robusta has no public symbol on either provider, so it is still generated — and
+         must say so where the real feeds say the opposite. */
+      ok("a generated feed says it is generated",
+         page().indexOf("Generated for this build") >= 0,
+         (page().match(/Generated for this build[^.]{0,50}/) || [""])[0]);
+      ok("a generated feed is labelled mock in its header",
+         !!byText(".wrap .chip", "mock"));
       ok("exactly one row is marked as selected",
          nodes('.wrap .pal-item[data-active="true"]').length === 1,
          nodes('.wrap .pal-item[data-active="true"]').length);
+    }
+
+    /* Candles, on a feed that has real sessions to draw. */
+    var brent = nodes(".wrap .pal-item").filter(function (r) {
+      return textOf(r).indexOf("Brent") >= 0;
+    })[0];
+    if (brent) {
+      brent.click();
+      await wait(320);
+      var toggle = byText(".seg button", "Candles");
+      ok("a feed with real sessions offers candles", !!toggle);
+      if (toggle) {
+        toggle.click();
+        await wait(320);
+        var rects = nodes(".wrap svg.chart rect").filter(function (r) {
+          return r.getAttribute("fill") && r.getAttribute("fill") !== "transparent";
+        });
+        ok("the candle chart drew a body per session", rects.length > 20,
+           rects.length + " bodies");
+        ok("sessions are coloured both ways",
+           rects.some(function (r) { return r.getAttribute("fill").indexOf("down") >= 0; }) &&
+           rects.some(function (r) { return r.getAttribute("fill").indexOf("up") >= 0; }));
+        ok("the footer says what the candles are",
+           /candles/i.test(page()), (page().match(/[A-Z]\w+ candles[^.]{0,40}/) || [""])[0]);
+        byText(".seg button", "Line").click();
+        await wait(260);
+        ok("and it goes back to a line",
+           nodes(".wrap svg.chart path").length > 0);
+      }
     }
 
     ok("driver cost is reported for every material",

@@ -28,7 +28,7 @@ start app/index.html          # or: open app/index.html
 # rebuild the dataset
 py -3.11 tools/build_ws.py               # materials, feeds, quotes, and the spend sample
 py -3.11 tools/build_data.py             # the wheat fixture the price model is checked against
-BARCHART_API_KEY=... py -3.11 tools/fetch_barchart.py   # real daily closes, optional
+py -3.11 tools/fetch_prices.py           # real daily OHLC, no key needed
 
 # checks
 py -3.11 tools/jscheck.py --app          # every script parses and runs
@@ -122,8 +122,10 @@ premium     = quote − driverCost          ← a subtraction, not a disclosure
 ```
 
 The premium is then measured against the **fair band**: the 25th–75th percentile of what
-every supplier of that material has charged over twelve months, added to this month's driver
-cost. Below four observations there is no band — quartiles of three numbers describe noise,
+every supplier of that material has charged *over driver cost* across twelve months,
+applied to this month's driver cost. A share rather than a sum of money, because the
+underlying moves — Brent ran 70% across the window this build pulled, and a supplier
+steady at 4% over cost has to read as steady rather than as a widening premium. Below four observations there is no band — quartiles of three numbers describe noise,
 and somebody would negotiate against them. Separately, the quote against the budget rate the
 business set, because "is this premium normal" and "can we afford this price" are two
 questions with two answers.
@@ -160,13 +162,14 @@ thing that was approved is no longer the thing on screen.
 
 `app/index.html` opens on the Market screen. Four beats, about ten minutes:
 
-1. **Market.** Opens on the feed with the widest reach, which on a book that imports most of
-   what it buys is USD/PHP — under all eight materials, and the chart shows the peso losing
-   11% over the year. Pick a window, scrub the chart and the big price follows the cursor
-   against where the window opened. Pick another feed from the watchlist. Then the part no
-   trading app has: what that feed is worth *inside* each material, and below it what every
-   feed did to each material's **driver cost** — the floor under a price, and the part no
-   supplier sets.
+1. **Market.** Opens on the feed with the widest reach, which on a book that imports most
+   of what it buys is USD/PHP — under all eight materials, and the chart shows the peso
+   actually losing ground over the year. Pick a window, scrub the chart and the big price
+   follows the cursor against where the window opened. Switch to **candles** on any feed
+   with real sessions behind it: daily at 1M and 3M, rolled up weekly at 6M and 1Y. Then
+   the part no trading app has — what that feed is worth *inside* each material, and what
+   every feed did to each material's **driver cost**, the floor under a price and the part
+   no supplier sets.
 2. **Price check.** The board opens on *Worth a call: Kalinga Highlands* — green coffee above
    the top of its fair band, with a premium that has widened four quarters running. Open the
    breakdown: published drivers, the FX conversion, the premium, and the line proving they add
@@ -183,21 +186,35 @@ thing that was approved is no longer the thing on screen.
 
 ### Where the price data comes from
 
-The levels are monthly prints and the daily path between them is generated for this build —
-every chart that draws one says so, and the price model only ever reads the monthly prints,
-because a quote has to be argued against a published number on a stated date.
+Half of it is real.
 
-`tools/fetch_barchart.py` swaps the generated paths for real daily closes from Barchart
-OnDemand. It runs at **build time**, not in the browser, for three independent reasons: a key
-in a static page is a published key; OnDemand sends no CORS header, so a browser request fails
-before the key matters; and the free tier is a couple of hundred calls a month against eleven
-feeds you would want daily. So it is pulled on the machine that runs the build and baked into
-`app/js/ws.js` like every other dataset here. Six of the eleven feeds have an exchange-traded
-equivalent and are mapped; the other five are assessed indices and private freight
-assessments with no public symbol, and keep their generated path and their label.
+`tools/fetch_prices.py` pulls real daily sessions for every feed with a public market and
+drops them into a build cache that `build_ws.py` picks up. As of the last build that is Brent,
+ICE sugar no.11, CBOT wheat, Malaysian crude palm oil and the USD/PHP, EUR/PHP and MYR/PHP
+rates the whole dataset converts through — about five hundred sessions each. The five feeds
+with no public market — an assessed potato flake index, containerboard, BOPP resin and two
+private freight assessments — keep a generated path and say so on every screen they appear.
+Robusta is generated too: Yahoo does not carry it, and Barchart does.
 
-It touches only the daily series. The monthly anchors are left alone, so turning real data on
-cannot quietly move a fair band.
+**It is a build step, not a fetch in the browser**, for three independent reasons: a key in a
+static page is a published key; neither provider sends an `Access-Control-Allow-Origin`
+header, so the request fails before the key matters; and Barchart's free tier is a couple of
+hundred calls a month against eleven feeds you would want daily. So it is pulled on the
+machine that runs the build and baked into `app/js/ws.js` like every other dataset here.
+
+Two providers. `yahoo` is the default and needs no key — a public but undocumented endpoint,
+fine for a build step and a demo, not something to put a customer's production reporting on.
+`barchart` is the licensed path: set `BARCHART_API_KEY` and it covers robusta as well. The
+endpoint and parameters are confirmed live; without a key it answers `401 API key is missing
+or not valid` rather than `404`.
+
+The supplier book stays invented. Quotes, premiums, spend lines and the company itself are
+generated, because they are a fictional customer's — so the workspace label reads **"Demo
+book, live prices"** and the tooltip says exactly which half is which, read off a provenance
+block the build writes from what actually came back.
+
+Delete the cache (`tools/fetch_prices.py --clear`) and rebuild, and the whole dataset goes
+back to being synthetic.
 
 ### What the model does, and what it is not allowed to do
 
