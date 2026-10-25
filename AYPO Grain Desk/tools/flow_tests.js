@@ -1,0 +1,483 @@
+/* Drives the three new flows through the real DOM, in the real app.
+
+   The route tests prove every page renders. These prove the things the brief actually asks
+   for, by clicking the buttons a person would click:
+
+     · the planted coffee quote opens above its band, with the widening trend on screen, and
+       the brief it generates contains no figure that is not in the fact table beside it
+     · the messy sample processes end to end, the review queue clears in a handful of clicks,
+       and the grand total does not move while it does
+     · the bulletin generates, declares its gaps, and cannot be exported until a person has
+       approved it — and goes back to un-exportable the moment it is edited again
+
+   async/await rather than the ES5 the app itself is written in: this is a test harness run
+   through tools/test_flows.py, not a file the app loads. */
+(function () {
+  "use strict";
+
+  var results = [];
+  function ok(name, cond, detail) {
+    results.push({ name: name, pass: !!cond, detail: detail === undefined ? "" : String(detail) });
+  }
+
+  function wait(ms) {
+    return new Promise(function (r) { setTimeout(r, ms); });
+  }
+  async function until(fn, label, timeout) {
+    var end = Date.now() + (timeout || 4000);
+    while (Date.now() < end) {
+      var v = fn();
+      if (v) return v;
+      await wait(60);
+    }
+    throw new Error("timed out waiting for " + label);
+  }
+
+  function nodes(sel, root) {
+    return Array.prototype.slice.call((root || document).querySelectorAll(sel));
+  }
+  function byText(sel, text, root) {
+    var hit = nodes(sel, root).filter(function (n) {
+      return (n.textContent || "").indexOf(text) >= 0;
+    });
+    return hit.length ? hit[0] : null;
+  }
+  /* Overlays stack, so the sheet under test is always the last one appended — the brief
+     opens on top of the price check rather than replacing it. */
+  function sheet() {
+    var all = nodes(".scrim .sheet");
+    return all.length ? all[all.length - 1] : null;
+  }
+  function closeSheet() { GD.closeTop(); }
+  function textOf(node) { return (node && node.textContent) || ""; }
+
+  function finish(err) {
+    if (err) ok("the flow ran to the end", false, err.message || String(err));
+    var failed = results.filter(function (r) { return !r.pass; });
+    var out = document.createElement("div");
+    out.id = "__flow_results";
+    out.textContent = JSON.stringify({
+      total: results.length, failed: failed.length, results: results
+    });
+    document.body.appendChild(out);
+    document.title = failed.length ? ("FAIL " + failed.length) : "OK";
+  }
+
+  /* ============================================================== 1 · the price check */
+
+  async function priceCheckFlow() {
+    GD.setWs("urc");
+    await wait(260);
+    GD.go("pricecheck");
+    await until(function () { return byText(".page-title", "Price check"); }, "the price check page");
+
+    var ws = GD.ws();
+    ok("the workspace switched to the demo", ws.key === "urc", ws.key);
+    ok("the demo label is on the page", !!byText(".chip", "Demo data"));
+
+    var coffee = GD.material("green_coffee", ws);
+    var live = GD.pricing.latestPerSupplier("green_coffee", ws.quotes).filter(function (q) {
+      return q.supplier_id === "kalinga";
+    })[0];
+    ok("the planted coffee quote is on the live board", !!live);
+    if (!live) return;
+
+    GD.showPriceCheck(live, ws);
+    var sh = await until(sheet, "the price-check sheet");
+    var t = textOf(sh);
+
+    ok("the sheet names the supplier", t.indexOf("Kalinga") >= 0);
+    ok("the quote reads as above the band", t.indexOf("Above the band by") >= 0,
+       t.slice(t.indexOf("Above the band") - 20, t.indexOf("Above the band") + 70));
+    ok("the widening trend is on screen", /widened \d+ quarters running/.test(t),
+       (t.match(/widened[^.]{0,80}/) || [""])[0]);
+    ok("the components are shown to sum to the quote",
+       t.indexOf("the quoted price exactly") >= 0);
+    ok("the premium history chart drew", !!sh.querySelector("svg.chart"));
+    ok("the band bar drew its key", t.indexOf("Fair band, 25th–75th") >= 0);
+    ok("the budget comparison is on screen", t.indexOf("Budget rate") >= 0);
+
+    /* The sum proof, read off the screen rather than off the model. */
+    var a = GD.pricing.assess(coffee, live, ws.quotes, GD.wsAsOf());
+    ok("the breakdown reconciles to the quoted price", a.breakdown.reconciles,
+       a.breakdown.total + " vs " + live.price);
+
+    /* ---- the brief */
+    var briefBtn = byText(".sheet-foot button", "Negotiation brief", sh);
+    ok("the brief button is in the sheet footer", !!briefBtn);
+    if (!briefBtn) return;
+    briefBtn.click();
+
+    var bs = await until(function () {
+      var s = sheet();
+      return (s && textOf(s).indexOf("Draft — yours to edit") >= 0) ? s : null;
+    }, "the brief sheet");
+
+    var ta = bs.querySelector("textarea");
+    ok("the brief opened in an editor", !!ta && ta.value.length > 400,
+       ta ? ta.value.length + " characters" : "no textarea");
+    var brief = ta ? ta.value : "";
+
+    ok("the brief names the supplier", brief.indexOf("Kalinga") >= 0);
+    ok("the brief states the fair band", /fair price between/.test(brief));
+    ok("the brief states the budget", brief.indexOf("budget rate for") >= 0);
+    ok("the brief gives three talking points",
+       (brief.match(/THREE THINGS TO PUT TO THEM([\s\S]*?)\n\nSOURCES/) || [, ""])[1]
+         .split("\n· ").length - 1 === 3,
+       (brief.match(/THREE THINGS TO PUT TO THEM([\s\S]*?)\n\nSOURCES/) || [, ""])[1]
+         .split("\n· ").length - 1);
+    ok("the brief is framed collaboratively, not as an accusation",
+       !/\b(overcharg|gouging|unacceptable|demand that|we will re-tender)\b/i.test(brief),
+       (brief.match(/overcharg\w*|gouging|unacceptable|demand that/i) || [""])[0]);
+    ok("the brief cites its sources", brief.indexOf("SOURCES") >= 0);
+    ok("nothing in the brief claims to have been sent",
+       brief.indexOf("nothing here has been sent") >= 0);
+
+    /* The acceptance criterion, tested the way it is written: no figure in the brief that is
+       not traceable to the data shown beside it. The fact table in this very sheet is the
+       whole of what the brief is allowed to say, so it is the thing to check against. */
+    var factTable = bs.querySelector(".table-wrap");
+    var facts = textOf(factTable);
+    ok("the fact table is on screen beside the draft", facts.length > 300, facts.length);
+    var check = GD.llm.verifyNumbers(brief, facts);
+    ok("every figure in the brief traces to the fact table (" + check.checked + " checked)",
+       check.ok, (check.details || []).slice(0, 6).map(function (d) {
+         return d.raw + " in “" + d.context + "”";
+       }).join("  ||  "));
+
+    /* And the check has teeth: an invented figure in the same text must fail it. */
+    var poisoned = brief + "\n· The market is expected to fall 37.4% by March.";
+    ok("the same check rejects an invented figure",
+       !GD.llm.verifyNumbers(poisoned, facts).ok,
+       JSON.stringify(GD.llm.verifyNumbers(poisoned, facts).unverified.slice(0, 4)));
+
+    ok("the copy and export actions are present",
+       !!byText(".sheet-foot button", "Copy", bs) &&
+       !!byText(".sheet-foot button", "Download .md", bs) &&
+       !!byText(".sheet-foot button", "Print / PDF", bs));
+
+    closeSheet();
+    await wait(260);
+    closeSheet();
+    await wait(260);
+  }
+
+  /* ---- the resin story, the other planted one */
+  async function resinFlow() {
+    var ws = GD.ws();
+    var resin = GD.material("pet_resin", ws);
+    var q = GD.pricing.latestPerSupplier("pet_resin", ws.quotes).filter(function (x) {
+      return x.supplier_id === "pacpoly";
+    })[0];
+    ok("the planted resin quote is on the live board", !!q);
+    if (!q) return;
+    GD.showPriceCheck(q, ws);
+    var sh = await until(sheet, "the resin sheet");
+    var t = textOf(sh);
+    ok("the resin quote reads as inside the band",
+       t.indexOf("Inside the band") >= 0, (t.match(/Inside the band[^.]*/) || [""])[0]);
+    var a = GD.pricing.assess(resin, q, ws.quotes, GD.wsAsOf());
+    ok("the resin quote is under budget", a.budget && !a.budget.over,
+       a.budget && a.budget.amount);
+    closeSheet();
+    await wait(260);
+  }
+
+  /* ================================================================ 2 · the wheat desk */
+
+  async function wheatFlow() {
+    GD.setWs("ufm");
+    await wait(300);
+    GD.go("quotes");
+    await until(function () { return byText(".page-title", "Quote board"); }, "the quote board");
+
+    var D = window.DESK;
+    ok("the quote board still shows every indication",
+       (document.body.textContent || "").indexOf(D.quotes.length + " indications") >= 0,
+       D.quotes.length);
+
+    var q = D.quotes[0];
+    GD.showQuote(q);
+    var sh = await until(sheet, "the wheat quote sheet");
+    var t = textOf(sh);
+    ok("a wheat quote still opens its four-way split",
+       t.indexOf("Reconstructed composition") >= 0);
+    ok("the wheat residual is unchanged on screen",
+       t.indexOf(GD.fmt.usd(q.residual_usd_mt)) >= 0, GD.fmt.usd(q.residual_usd_mt));
+    closeSheet();
+    await wait(260);
+
+    /* The same wheat quote through the generic price model: the premium it reports has to be
+       the residual the board just showed, or the two screens disagree about one email. */
+    var wq = null;
+    GD.ws().quotes.forEach(function (x) { if (x.id === q.id) wq = x; });
+    ok("the wheat quote exists as a material quote", !!wq);
+    if (wq) {
+      var m = GD.material(wq.material_id, GD.ws());
+      var bd = GD.pricing.breakdown(m, wq);
+      ok("the generic premium equals the board's residual",
+         Math.abs(bd.premium - q.residual_usd_mt) < 0.011,
+         bd.premium + " vs " + q.residual_usd_mt);
+      ok("wheat carries no budget rate, and says so",
+         GD.pricing.budgetGap(m, wq.price) === null);
+    }
+
+    ok("Night Watch is still in the topbar on the wheat desk",
+       !!byText(".topbar button", "Night Watch"));
+
+    /* The thin-history path: a wheat class with only a couple of quotes must refuse to draw
+       a band rather than quartile three numbers. */
+    var thin = null;
+    GD.ws().materials.forEach(function (m) {
+      if (thin) return;
+      var b = GD.pricing.band(m, GD.ws().quotes, GD.wsAsOf(), GD.wsAsOf());
+      if (!b.established) thin = m;
+    });
+    ok("a material with too little history has no band", !!thin,
+       thin ? thin.name : "every wheat class has four or more quotes");
+    if (thin) {
+      var tq = GD.pricing.latestPerSupplier(thin.id, GD.ws().quotes)[0];
+      GD.showPriceCheck(tq, GD.ws());
+      var ts = await until(sheet, "the thin-history sheet");
+      ok("the thin-history sheet says there is no band yet",
+         textOf(ts).indexOf("No band yet") >= 0);
+      ok("the thin-history sheet still shows the breakdown",
+         textOf(ts).indexOf("the quoted price exactly") >= 0);
+      ok("the thin-history sheet says no budget is held",
+         textOf(ts).indexOf("No budget rate held for this material") >= 0);
+      closeSheet();
+      await wait(260);
+    }
+
+    /* And the bulletin on the wheat desk, whose driver legs are held at an observed
+       settlement rather than a moving monthly print. */
+    GD.go("bulletin");
+    await until(function () { return byText(".page-title", "Market bulletin"); },
+                "the wheat bulletin page");
+    byText("button", "Generate draft").click();
+    var wcard = await until(function () { return byText(".card-title", "The draft"); },
+                           "the wheat draft", 20000);
+    var wtext = wcard.closest(".card").querySelector("textarea").value;
+    ok("the wheat desk gets a bulletin too", wtext.length > 1000, wtext.length);
+    ok("it says where a feed has no new print",
+       wtext.indexOf("no new print since") >= 0 ||
+       wtext.indexOf("No data for this period") >= 0);
+    ok("it says crop commentary is not applicable to a wheat class",
+       wtext.indexOf("Not applicable") >= 0);
+    byText("button", "Discard").click();
+    await wait(200);
+  }
+
+  /* ================================================================== 3 · the spend run */
+
+  async function spendFlow() {
+    GD.setWs("urc");
+    await wait(300);
+    GD.go("spend");
+    await until(function () { return byText(".page-title", "Spend cleansing"); },
+                "the spend page");
+
+    var load = byText("button", "Load the sample export");
+    ok("the sample is one click away", !!load);
+    if (!load) return;
+    load.click();
+
+    await until(function () { return GD.spendRun; }, "the processed run", 20000);
+    await until(function () { return byText(".card-title", "What the file became"); },
+                "the counter card");
+
+    var run = GD.spendRun;
+    ok("every line in the sample was processed",
+       run.counts.total === window.SPEND_SAMPLE.rows,
+       run.counts.total + " vs " + window.SPEND_SAMPLE.rows);
+    ok("the counter is on screen",
+       (document.body.textContent || "").indexOf(GD.fmt.n(run.counts.total, 0)) >= 0);
+    ok("duplicates were flagged", run.counts.duplicates > 0, run.counts.duplicates);
+    ok("the report ties to the lines before anything is resolved",
+       GD.spendReport.reconciles);
+
+    var totalBefore = GD.spendReport.total;
+    var startedWith = run.counts.review;
+    ok("something was left for a person", startedWith > 0, startedWith);
+    ok("the queue is a handful of decisions, not a list of lines",
+       run.counts.decisions <= 12, run.counts.decisions + " decisions / " +
+       startedWith + " lines");
+
+    /* Clear the queue the way a person would: take each decision, pick the suggested value
+       where there is one, and mark the rest unclassifiable. */
+    var clicks = 0;
+    while (clicks < 30) {
+      var queue = byText(".card-title", "Review queue");
+      if (!queue) break;
+      var card = queue.closest(".card");
+      var row = card.querySelector(".note-row");
+      if (!row) break;
+      var sels = nodes("select", row);
+      var pickable = sels.every(function (s) { return !!s.value; });
+      if (pickable) {
+        byText("button", "Confirm", row).click();
+      } else {
+        var notMine = byText("button", "Not one of our materials", row);
+        if (notMine && sels.length === 1) {
+          notMine.click();
+        } else {
+          /* Nothing is pre-selected, so choose the first real option — a person would read
+             the text and pick; the test only needs a valid choice. */
+          sels.forEach(function (s) {
+            if (!s.value && s.options.length > 1) s.value = s.options[1].value;
+          });
+          byText("button", "Confirm", row).click();
+        }
+      }
+      clicks++;
+      await wait(120);
+      if (!GD.spendRun.counts.review) break;
+    }
+
+    ok("the queue cleared in " + clicks + " clicks", GD.spendRun.counts.review === 0,
+       GD.spendRun.counts.review + " lines still waiting after " + clicks + " clicks");
+    ok("one click resolved many lines", clicks < startedWith,
+       clicks + " clicks for " + startedWith + " lines");
+
+    await until(function () { return byText(".card-title", "Does it tie?"); },
+                "the reconciliation card");
+    var rep = GD.spendlib.report(GD.spendRun);
+    ok("the report still ties after the queue was cleared", rep.reconciles,
+       rep.checks.map(function (c) { return c.name + " " + c.total; }).join(" | "));
+    ok("clearing the queue did not move the grand total",
+       Math.abs(rep.total - totalBefore) < 0.011, rep.total + " vs " + totalBefore);
+    ok("price paid per unit is reported against budget for every material",
+       rep.perUnit.length === GD.ws().materials.length, rep.perUnit.length);
+    ok("the corrections were remembered",
+       GD.spendlib.countLearned(GD.spendlib.loadLearned("urc")) > 0);
+
+    /* Re-upload: the same text must resolve on its own this time. */
+    var parsed = GD.spendlib.parseDelimited(window.SPEND_SAMPLE.text);
+    parsed.name = "re-upload";
+    var again = GD.spendlib.process({
+      ws: GD.ws(), parsed: parsed, learned: GD.spendlib.loadLearned("urc")
+    });
+    ok("on re-upload the queue is shorter than it was first time",
+       again.counts.review < startedWith, again.counts.review + " vs " + startedWith);
+    ok("the re-upload report ties too", GD.spendlib.report(again).reconciles);
+
+    ok("the cleaned lines can be exported",
+       !!byText("button", "Download cleaned CSV") && !!byText("button", "Report CSV"));
+
+    /* The .xlsx path, against the real workbook on disk. URC's export is an Excel file, and
+       telling a buyer to re-save it as CSV is the manual step this feature removes. */
+    try {
+      var res = await fetch("../app/data/spend_sample.xlsx");
+      if (!res.ok) res = await fetch("data/spend_sample.xlsx");
+      var buf = await res.arrayBuffer();
+      var parsedX = await GD.spendlib.parseXlsx(buf);
+      ok("the .xlsx workbook parses to the same shape as the CSV",
+         parsedX.rows.length === window.SPEND_SAMPLE.rows &&
+         parsedX.header.length === GD.spendRun.columns.header.length,
+         parsedX.rows.length + " rows, " + parsedX.header.length + " columns");
+      var runX = GD.spendlib.process({
+        ws: GD.ws(), parsed: parsedX, learned: { vendor: {}, material: {} }
+      });
+      var repX = GD.spendlib.report(runX);
+      ok("the .xlsx run reconciles like the CSV one", repX.reconciles);
+      ok("the .xlsx run reaches the same total as the CSV",
+         Math.abs(repX.total - totalBefore) < 0.011,
+         repX.total + " vs " + totalBefore);
+    } catch (e) {
+      ok("the .xlsx workbook parses", false, e && e.message);
+    }
+  }
+
+  /* ================================================================= 4 · the bulletin */
+
+  async function bulletinFlow() {
+    GD.go("bulletin");
+    await until(function () { return byText(".page-title", "Market bulletin"); },
+                "the bulletin page");
+
+    var gen = byText("button", "Generate draft");
+    ok("the bulletin is one click away", !!gen);
+    if (!gen) return;
+    var t0 = Date.now();
+    gen.click();
+
+    var card = await until(function () { return byText(".card-title", "The draft"); },
+                          "the draft card", 20000);
+    var took = Date.now() - t0;
+    ok("a complete bulletin generated in under a minute (" + took + " ms)", took < 60000, took);
+
+    var ws = GD.ws();
+    var secCard = byText(".card-title", "Sections").closest(".card");
+    var rows = nodes("tbody tr", secCard);
+    ok("there is a section for every material plus the overview",
+       rows.length === ws.materials.length + 1,
+       rows.length + " vs " + (ws.materials.length + 1));
+
+    var ta = card.closest(".card").querySelector("textarea");
+    ok("the draft opened in an editor", !!ta && ta.value.length > 1500,
+       ta ? ta.value.length : "none");
+    var text = ta ? ta.value : "";
+
+    ok("every section heading is in the draft",
+       ws.materials.every(function (m) { return text.indexOf("## " + m.name) >= 0; }));
+    ok("the draft covers drivers, FX, freight, crop and a buying line",
+       text.indexOf("### Drivers") >= 0 && text.indexOf("### FX") >= 0 &&
+       text.indexOf("### Freight") >= 0 && text.indexOf("### Crop and weather") >= 0 &&
+       text.indexOf("### What this means for buying") >= 0);
+    ok("a missing feed is declared rather than filled",
+       text.indexOf("No data for this period") >= 0,
+       (text.match(/No data for this period[^\n]{0,80}/) || [""])[0]);
+    ok("a material with no crop read says so instead of inventing one",
+       text.indexOf("Not applicable") >= 0);
+    ok("every figure names a source",
+       (text.match(/\(([^)]*,\s*\d+ \w+ \d{4})\)/g) || []).length > 10,
+       (text.match(/\(([^)]*,\s*\d+ \w+ \d{4})\)/g) || []).length + " dated citations");
+    ok("mock feeds are labelled as mock", text.indexOf("[mock feed]") >= 0);
+
+    /* The gate. */
+    var pdf = byText("button", "Export PDF");
+    var md = byText("button", "Download .md");
+    ok("export is blocked before approval",
+       pdf && pdf.hasAttribute("disabled") && md && md.hasAttribute("disabled"));
+
+    var approve = byText("button", "Approve for export");
+    ok("there is an approve action", !!approve);
+    approve.click();
+    await wait(140);
+    ok("export opens once a person approves",
+       !byText("button", "Export PDF").hasAttribute("disabled") &&
+       !byText("button", "Download .md").hasAttribute("disabled"));
+    ok("the approved state is shown", !!byText(".chip", "approved"));
+
+    /* Editing it again has to close the gate: what was approved is no longer on screen. */
+    ta.value = text + "\n· A line somebody typed after approval.";
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    await wait(140);
+    ok("editing an approved draft closes the gate again",
+       byText("button", "Export PDF").hasAttribute("disabled"));
+    ok("and says why", !!byText(".chip", "edited since approval"));
+
+    byText("button", "Approve again").click();
+    await wait(140);
+    ok("approving again reopens it",
+       !byText("button", "Export PDF").hasAttribute("disabled"));
+  }
+
+  /* ========================================================================== run it */
+
+  (async function () {
+    try {
+      await until(function () { return window.GD && GD.ws && GD.ws(); }, "the app to boot");
+      await wait(400);
+      await priceCheckFlow();
+      await resinFlow();
+      await wheatFlow();
+      await spendFlow();
+      await bulletinFlow();
+      finish();
+    } catch (err) {
+      finish(err);
+    }
+  })();
+
+})();

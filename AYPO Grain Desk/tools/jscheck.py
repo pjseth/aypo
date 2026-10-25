@@ -30,9 +30,25 @@ import threading
 EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
+# The desk prints pesos and baht. A Windows console defaults to cp1252, which cannot encode
+# either, and a test run should not die on its own output.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
 APP_ORDER = [
     "app/js/data.js",
+    "app/js/ws.js",
+    "app/js/spend_sample.js",
+    "app/js/env.js",
     "app/js/core.js",
+    "app/js/workspace.js",
+    "app/js/export.js",
+    "app/js/pricing.js",
+    "app/js/spendlib.js",
+    "app/js/llm.js",
     "app/js/surfaces/brief.js",
     "app/js/surfaces/quotes.js",
     "app/js/surfaces/position.js",
@@ -40,6 +56,9 @@ APP_ORDER = [
     "app/js/surfaces/cargo.js",
     "app/js/surfaces/margin.js",
     "app/js/surfaces/savings.js",
+    "app/js/surfaces/pricecheck.js",
+    "app/js/surfaces/spend.js",
+    "app/js/surfaces/bulletin.js",
     "app/js/app.js",
 ]
 
@@ -83,11 +102,18 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+# Threaded: the page now pulls twenty-odd scripts, and a single-threaded server drops one
+# under that burst. A script that silently never arrives shows up as a baffling "X is not a
+# function" from whichever file loaded after it.
+class Server(socketserver.ThreadingTCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 @contextlib.contextmanager
 def serve(directory):
     handler = functools.partial(Quiet, directory=str(directory))
-    with socketserver.TCPServer(("127.0.0.1", 0), handler) as httpd:
-        httpd.allow_reuse_address = True
+    with Server(("127.0.0.1", 0), handler) as httpd:
         port = httpd.server_address[1]
         t = threading.Thread(target=httpd.serve_forever, daemon=True)
         t.start()

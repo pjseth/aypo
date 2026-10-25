@@ -19,7 +19,16 @@
       folds: "Quote Clerk · Fair Value · Negotiator · Scout",
       blurb: "Reads every indication into structured rows, rebuilds the four components, " +
              "reports the residual nobody itemised, and drafts the counter.",
-      route: "quotes"
+      route: "quotes",
+      /* The same question asked of a desk that buys thirty thousand SKUs rather than ten
+         wheat classes is the price check: what is in this price, and is the premium normal. */
+      urc: {
+        route: "pricecheck", icon: "scale",
+        folds: "Fair Value · Negotiator",
+        blurb: "Splits every quote into its published drivers and the premium the supplier " +
+               "is carrying, measures that premium against the whole material's history, " +
+               "and drafts the brief for the call."
+      }
     },
     {
       key: "watch", name: "The Watch", icon: "market",
@@ -27,7 +36,14 @@
       folds: "Night Watch · The Analyst · Position Keeper",
       blurb: "Owns the clock — the release-second verdict, the morning brief, and the " +
              "position carried against both.",
-      route: "market"
+      route: "market",
+      urc: {
+        route: "bulletin", icon: "file",
+        folds: "The Analyst",
+        blurb: "Owns the fortnightly clock. Assembles the market bulletin from the driver " +
+               "feeds, says where the data is missing instead of filling it, and waits for " +
+               "a person to approve it."
+      }
     },
     {
       key: "clerk", name: "The Clerk", icon: "cargo",
@@ -35,11 +51,29 @@
       folds: "Cargo Clerk · Blender",
       blurb: "Splits the vessel pack, reconciles weights and specs against the contract, " +
              "and carries landed cost through the blend to ฿/kg.",
-      route: "cargo"
+      route: "cargo",
+      urc: {
+        route: "spend", icon: "dollar",
+        folds: "Spend Clerk",
+        blurb: "Takes the raw S/4HANA export, resolves the vendor spellings and the free-text " +
+               "material descriptions, converts the currencies, flags the double postings, " +
+               "and hands back a report that reconciles."
+      }
     }
   ];
 
+  /* An agent's face changes with the workspace; the question it answers does not. */
+  function agentFor(a) {
+    var k = GD.wsKey();
+    return (k && k !== "ufm" && a[k]) ? a[k] : a;
+  }
+  function agentRoute(a) {
+    var f = agentFor(a);
+    return GD.routes()[f.route] ? f.route : null;
+  }
+
   function agentState(a) {
+    if (GD.wsKey() !== "ufm") return urcAgentState(a);
     if (a.key === "buyer") {
       var stale = D.quotes.filter(function (q) { return q.implied_margin > 3; }).length;
       return stale ? { state: "attention", n: stale } : { state: "idle", n: 0 };
@@ -53,6 +87,17 @@
     }, 0);
     return (overdue + claims) ? { state: "attention", n: overdue + claims } : { state: "idle", n: 0 };
   }
+
+  /* Each of these reads the same number its surface's sidebar badge reads, so the dot and the
+     count can never disagree with the screen behind them. */
+  function urcAgentState(a) {
+    var routes = GD.routes();
+    var key = agentFor(a).route;
+    var def = routes[key];
+    var n = def && def.badge ? def.badge() : 0;
+    if (!n) return { state: a.key === "watch" ? "working" : "idle", n: 0 };
+    return { state: "attention", n: n };
+  }
   GD.AGENTS = AGENTS;
   GD.agentState = agentState;
 
@@ -63,12 +108,14 @@
     rail.appendChild(el("div", { class: "rail-logo", title: "Grain Desk", text: "GD" }));
 
     AGENTS.forEach(function (a) {
+      if (!agentRoute(a)) return;
+      var f = agentFor(a);
       var st = agentState(a);
       var btn = el("button", {
         class: "rail-btn", type: "button",
         "aria-label": a.name + " — " + a.question,
         onclick: function () { showAgent(a); }
-      }, [icon(a.icon, 17, 1.6), el("span", { class: "dot", "data-state": st.state })]);
+      }, [icon(f.icon || a.icon, 17, 1.6), el("span", { class: "dot", "data-state": st.state })]);
       GD.tipOn(btn, "<b>" + GD.esc(a.name) + "</b><div class='tip-mute'>" + GD.esc(a.question) + "</div>" +
         (st.n ? "<div class='tip-row'><span class='tip-mute'>needs you</span><b>" + st.n + "</b></div>" : ""));
       rail.appendChild(btn);
@@ -79,29 +126,89 @@
 
   function showAgent(a) {
     var st = agentState(a);
+    var f = agentFor(a);
+    var target = agentRoute(a);
     GD.sheet({
       title: a.name,
       sub: a.question,
       body: function (close) {
         return [
-          el("p", { style: { color: "var(--ink-2)", "margin-bottom": "16px" }, text: a.blurb }),
+          el("p", { style: { color: "var(--ink-2)", "margin-bottom": "16px" }, text: f.blurb }),
           GD.kv([
-            ["Folds in", a.folds],
+            ["Folds in", f.folds],
             ["State", el("span", { class: "chip chip-" + (st.state === "attention" ? "warn" : st.state === "working" ? "good" : "") },
               [st.state === "attention" ? st.n + " need you" : st.state === "working" ? "Running" : "Idle"])],
-            ["Approval", a.key === "buyer" ? "Drafts only. Pavin sends."
+            ["Approval", a.key === "buyer" ? "Drafts only. A person sends."
               : a.key === "watch" ? "Alerts freely. Never places an order."
-              : "Raises claims for review. Never files one."]
+              : GD.wsKey() === "ufm" ? "Raises claims for review. Never files one."
+                                     : "Classifies, then asks about anything it is unsure of."]
           ])
         ];
       },
       foot: function (close) {
         return [
-          el("button", {
+          target ? el("button", {
             class: "btn btn-primary", type: "button", "data-autofocus": "true",
-            onclick: function () { close(); GD.go(a.route); }
-          }, [icon("chevR", 14, 2), "Open " + a.name + "'s surface"]),
+            onclick: function () { close(); GD.go(target); }
+          }, [icon("chevR", 14, 2), "Open " + a.name + "'s surface"]) : null,
           el("button", { class: "btn", type: "button", onclick: close, text: "Close" })
+        ];
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------- workspaces
+
+     Two customers' data lives in this build. A surface declares which workspaces it serves;
+     a surface that declares nothing belongs to the wheat desk, which is every screen that
+     existed before materials did. */
+
+  function allowed(def) {
+    var list = def.ws || ["ufm"];
+    return list.indexOf(GD.wsKey()) >= 0;
+  }
+  function firstAllowed() {
+    var routes = GD.routes();
+    var keys = Object.keys(routes);
+    for (var i = 0; i < keys.length; i++) if (allowed(routes[keys[i]])) return keys[i];
+    return keys[0];
+  }
+
+  function showWorkspaces() {
+    GD.sheet({
+      title: "Workspace",
+      sub: "Each one is a separate customer's materials, suppliers and quotes",
+      body: function (close) {
+        return GD.wsAll().map(function (w) {
+          var active = w.key === GD.wsKey();
+          var n = (w.materials || []).length;
+          var row = el("button", {
+            class: "pal-item", type: "button",
+            "data-active": String(active),
+            style: { width: "100%", "text-align": "left", padding: "12px 13px" },
+            onclick: function () { close(); GD.setWs(w.key); }
+          }, [
+            icon(active ? "check" : "globe", 16, 1.75),
+            el("span", { style: { flex: "1", "min-width": "0" } }, [
+              el("b", { style: { display: "block", "font-weight": "600" }, text: w.name }),
+              el("span", {
+                style: { "font-size": "var(--t-xs)", color: "var(--ink-3)" },
+                text: w.blurb
+              })
+            ]),
+            w.demo ? GD.chip("demo", "warn") : null,
+            el("span", { class: "hint", text: n + " materials · " + w.home_currency })
+          ]);
+          return row;
+        });
+      },
+      foot: function (close) {
+        return [
+          el("button", { class: "btn btn-primary", type: "button", "data-autofocus": "true",
+            onclick: close, text: "Close" }),
+          el("span", { style: { flex: "1" } }),
+          el("span", { class: "card-sub",
+            text: "The wheat desk is the default and is unchanged by any of this." })
         ];
       }
     });
@@ -111,20 +218,36 @@
 
   function buildSidebar() {
     var side = el("aside", { class: "sidebar" });
+    var ws = GD.ws();
 
-    side.appendChild(el("div", { class: "side-head" }, [
-      el("span", { class: "avatar", text: "U" }),
+    var head = el("button", {
+      class: "side-head", type: "button",
+      "aria-label": "Switch workspace — currently " + ws.name,
+      style: { width: "100%", "text-align": "left", cursor: "pointer" },
+      onclick: showWorkspaces
+    }, [
+      el("span", { class: "avatar", text: ws.short.slice(0, 1).toUpperCase() }),
       el("div", { class: "org" }, [
-        el("div", { class: "org-name", text: D.profile.mill }),
-        el("div", { class: "org-sub", text: D.profile.group.join(" · ") + " · " + D.profile.country })
-      ])
-    ]));
+        el("div", { class: "org-name", text: ws.name }),
+        el("div", {
+          class: "org-sub",
+          text: ws.key === "ufm"
+            ? D.profile.group.join(" · ") + " · " + D.profile.country
+            : ws.country + " · " + ws.home_currency + " · demo data"
+        })
+      ]),
+      icon("chevD", 14, 1.6)
+    ]);
+    GD.tipOn(head, "<b>" + GD.esc(ws.name) + "</b><div class='tip-mute'>" +
+      GD.esc(ws.blurb) + "</div><div class='tip-mute'>Click to switch workspace.</div>");
+    side.appendChild(head);
 
     var scroll = el("div", { class: "side-scroll" });
     var routes = GD.routes();
     var groups = {};
     Object.keys(routes).forEach(function (k) {
       var r = routes[k];
+      if (!allowed(r)) return;
       (groups[r.group] = groups[r.group] || []).push(k);
     });
 
@@ -149,10 +272,15 @@
     });
     side.appendChild(scroll);
 
-    /* Savings ledger as the sidebar meter — the number that justifies renewal. */
+    side.appendChild(ws.key === "ufm" ? wheatFoot() : wsFoot(ws));
+    return side;
+  }
+
+  /* Savings ledger as the sidebar meter — the number that justifies renewal. */
+  function wheatFoot() {
     var saved = D.savings_total;
     var target = D.advisor.fee_per_year;
-    side.appendChild(el("div", { class: "side-foot" }, [
+    return el("div", { class: "side-foot" }, [
       el("div", { class: "meter-card" }, [
         el("div", { class: "meter-top" }, [
           el("span", { class: "meter-val", text: fmt.money(saved) }),
@@ -177,24 +305,68 @@
         ]),
         icon("chevR", 14, 1.6)
       ])
-    ]));
-    return side;
+    ]);
+  }
+
+  /* For a workspace without a savings ledger, the meter carries the one honest number there
+     is: how much of the book the desk can actually see. */
+  function wsFoot(ws) {
+    var covered = 0;
+    ws.materials.forEach(function (m) {
+      if (ws.quotes.some(function (q) { return q.material_id === m.id; })) covered++;
+    });
+    var pct = ws.materials.length ? covered / ws.materials.length : 0;
+    return el("div", { class: "side-foot" }, [
+      el("div", { class: "meter-card" }, [
+        el("div", { class: "meter-top" }, [
+          el("span", { class: "meter-val", text: covered + " of " + ws.materials.length }),
+          el("span", { class: "meter-cap", text: "materials priced" })
+        ]),
+        el("div", { class: "meter-track" }, [
+          el("div", { class: "meter-fill", style: { width: (pct * 100).toFixed(1) + "%" } })
+        ]),
+        el("div", {
+          class: "meter-cap",
+          text: fmt.n(ws.quotes.length, 0) + " quotes from " + ws.suppliers.length + " suppliers"
+        })
+      ]),
+      el("button", {
+        class: "user-row", type: "button",
+        onclick: showWorkspaces
+      }, [
+        el("span", { class: "avatar", text: "CP" }),
+        el("div", { class: "who" }, [
+          el("b", { text: "Central procurement" }),
+          el("span", { text: ws.country + " · demo workspace" })
+        ]),
+        icon("chevR", 14, 1.6)
+      ])
+    ]);
   }
 
   /* -------------------------------------------------------- market strip */
 
   function buildStrip() {
     var strip = el("div", { class: "strip", role: "region", "aria-label": "Market" });
+    var wheat = GD.wsKey() === "ufm";
+    /* The wheat desk's strip is DESK.instruments, the same array the Market surface reads.
+       Another workspace brings its own feeds, and the strip reads whichever is active. */
+    var instruments = GD.wsInstruments();
+    var target = GD.routes().market && wheat ? "market" : "bulletin";
 
-    D.instruments.forEach(function (ins) {
+    instruments.forEach(function (ins) {
       var isPrice = ins.unit === "c/bu";
-      var dpByUnit = ins.unit === "THB" ? 3 : ins.unit === "USD/day" ? 0 : 2;
-      var val = ins.unit === "USD/day" ? fmt.n(ins.last, 0) : fmt.n(ins.last, dpByUnit);
+      /* Decimals from the magnitude, not from a list of units to keep in step: a four-figure
+         level reads better flat, a rate needs its third place. */
+      var dp = ins.unit === "THB" ? 3 : ins.unit === "USD/day" ? 0
+        : (Math.abs(ins.last) >= 1000 ? 0 : 2);
+      var val = fmt.n(ins.last, dp);
       /* A rising input price costs the mill money, so up is the bad tone here. */
       var tone = GD.toneFor(ins.change);
-      var btn = el("button", { class: "tick", type: "button", onclick: function () { GD.go("market"); } }, [
+      var btn = el("button", { class: "tick", type: "button", onclick: function () { GD.go(target); } }, [
         el("span", { class: "tick-badge" }, [
-          icon(ins.role === "fx" ? "globe" : ins.role === "freight" ? "ship" : "wheat", 14, 1.6)
+          icon(ins.role === "fx" ? "globe" : ins.role === "freight" ? "ship"
+            : wheat ? "wheat" : "market", 14, 1.6)
         ]),
         el("span", { class: "tick-body" }, [
           el("span", { class: "tick-value" }, [
@@ -218,8 +390,34 @@
       strip.appendChild(btn);
     });
 
-    /* Next WASDE — the clock The Watch is built around. */
-    var next = D.wasde.filter(function (w) { return w.status === "scheduled"; })[0];
+    /* Next WASDE — the clock The Watch is built around. Wheat only: it is a USDA report on
+       the US grain balance sheet, and putting it over a coffee and resin book would be
+       decoration. That workspace has its own clock, the fortnightly bulletin. */
+    var next = wheat ? D.wasde.filter(function (w) { return w.status === "scheduled"; })[0] : null;
+    if (!wheat) {
+      var due = GD.bulletinDue ? GD.bulletinDue() : null;
+      if (due) {
+        var db = el("button", {
+          class: "tick", type: "button", style: { "margin-left": "auto" },
+          onclick: function () { GD.go("bulletin"); }
+        }, [
+          el("span", {
+            class: "tick-badge",
+            style: { background: "var(--accent-soft)", color: "var(--accent-2)" }
+          }, [icon("clock", 14, 1.8)]),
+          el("span", { class: "tick-body" }, [
+            el("span", { class: "tick-value" }, [
+              el("span", { text: due.days <= 0 ? "due now" : "in " + due.days + " days" })
+            ]),
+            el("span", { class: "tick-label", text: "Next bulletin" })
+          ])
+        ]);
+        GD.tipOn(db, "<b>Market bulletin — " + GD.esc(fmt.date(due.date)) +
+          "</b><div class='tip-mute'>Issued every " + due.cadence +
+          " days. The last one went out " + GD.esc(fmt.date(due.last)) + ".</div>");
+        strip.appendChild(db);
+      }
+    }
     if (next) {
       var days = fmt.daysBetween(D.built, next.date);
       var nb = el("button", {
@@ -242,9 +440,11 @@
   /* ------------------------------------------------------------- topbar */
 
   function buildTopbar() {
+    var wheat = GD.wsKey() === "ufm";
+    var ws = GD.ws();
     var crumbs = el("div", { class: "crumbs" }, [
-      icon("wheat", 14, 1.6),
-      el("span", { text: D.profile.short }),
+      icon(wheat ? "wheat" : "globe", 14, 1.6),
+      el("span", { text: ws.short }),
       el("span", { class: "sep", text: "/" }),
       el("b", { "data-crumb": "", text: "" })
     ]);
@@ -258,11 +458,23 @@
       el("span", { class: "kbd-wrap" }, [el("kbd", { class: "kbd", text: "⌘K" })])
     ]);
 
-    var nightBtn = el("button", {
-      class: "btn btn-primary", type: "button",
-      onclick: function () { GD.nightWatch(); }
-    }, [icon("zap", 14, 2), "Night Watch"]);
-    GD.tipOn(nightBtn, "Replay the 9 Oct WASDE alert exactly as it landed");
+    /* Night Watch is the wheat desk's interrupt — a WASDE release replay. There is no
+       equivalent clock on a food manufacturer's book, so the other workspace gets the action
+       that is actually waiting on a person: the fortnightly bulletin. */
+    var nightBtn;
+    if (wheat) {
+      nightBtn = el("button", {
+        class: "btn btn-primary", type: "button",
+        onclick: function () { GD.nightWatch(); }
+      }, [icon("zap", 14, 2), "Night Watch"]);
+      GD.tipOn(nightBtn, "Replay the 9 Oct WASDE alert exactly as it landed");
+    } else {
+      nightBtn = el("button", {
+        class: "btn btn-primary", type: "button",
+        onclick: function () { GD.go("bulletin"); }
+      }, [icon("file", 14, 2), "Market bulletin"]);
+      GD.tipOn(nightBtn, "The fortnightly bulletin — generate, edit, approve, export");
+    }
 
     return el("header", { class: "topbar" }, [
       el("button", {
@@ -289,30 +501,60 @@
   function paletteItems() {
     var out = [];
     var routes = GD.routes();
+    var wheat = GD.wsKey() === "ufm";
     Object.keys(routes).forEach(function (k) {
+      if (!allowed(routes[k])) return;
       out.push({
         group: "Go to", label: routes[k].label, icon: routes[k].icon,
         hint: routes[k].group, run: function () { GD.go(k); }
       });
     });
-    out.push({
-      group: "Actions", label: "Replay the WASDE alert", icon: "zap", hint: "Night Watch",
-      run: function () { GD.nightWatch(); }
+    GD.wsAll().forEach(function (w) {
+      if (w.key === GD.wsKey()) return;
+      out.push({
+        group: "Workspace", label: "Switch to " + w.name, icon: "globe",
+        hint: w.materials.length + " materials",
+        run: function () { GD.setWs(w.key); }
+      });
     });
-    D.quotes.slice().sort(function (a, b) { return a.received < b.received ? 1 : -1; })
-      .slice(0, 12).forEach(function (q) {
+    if (wheat) {
+      out.push({
+        group: "Actions", label: "Replay the WASDE alert", icon: "zap", hint: "Night Watch",
+        run: function () { GD.nightWatch(); }
+      });
+      D.quotes.slice().sort(function (a, b) { return a.received < b.received ? 1 : -1; })
+        .slice(0, 12).forEach(function (q) {
+          out.push({
+            group: "Quotes", label: q.supplier + " · " + q.cls, icon: "quotes",
+            hint: fmt.usd(q.flat) + "/t",
+            run: function () { GD.go("quotes"); setTimeout(function () { GD.showQuote(q); }, 60); }
+          });
+        });
+      D.cargoes.forEach(function (c) {
         out.push({
-          group: "Quotes", label: q.supplier + " · " + q.cls, icon: "quotes",
-          hint: fmt.usd(q.flat) + "/t",
-          run: function () { GD.go("quotes"); setTimeout(function () { GD.showQuote(q); }, 60); }
+          group: "Cargoes", label: c.vessel, icon: "ship", hint: c.origin + " · " + c.status,
+          run: function () { GD.go("cargo"); setTimeout(function () { GD.showCargo(c); }, 60); }
         });
       });
-    D.cargoes.forEach(function (c) {
-      out.push({
-        group: "Cargoes", label: c.vessel, icon: "ship", hint: c.origin + " · " + c.status,
-        run: function () { GD.go("cargo"); setTimeout(function () { GD.showCargo(c); }, 60); }
+    }
+    /* The live board of the active workspace: the latest quote from each supplier of each
+       material, which is what somebody reaching for the palette is usually after. */
+    var ws = GD.ws();
+    if (ws && GD.routes().pricecheck && GD.pricing) {
+      ws.materials.forEach(function (m) {
+        GD.pricing.latestPerSupplier(m.id, ws.quotes).forEach(function (q) {
+          out.push({
+            group: "Price check", label: GD.supplierName(q.supplier_id, ws) + " · " + m.name,
+            icon: "scale",
+            hint: GD.curUnit(q.price, m) + "/" + m.unit,
+            run: function () {
+              GD.go("pricecheck");
+              setTimeout(function () { GD.showPriceCheck(q, ws); }, 60);
+            }
+          });
+        });
       });
-    });
+    }
     return out;
   }
 
@@ -471,16 +713,42 @@
     var main = el("div", { class: "main" });
     var content = el("main", { class: "content", id: "content", tabindex: "-1" });
 
-    app.appendChild(buildRail());
-    app.appendChild(buildSidebar());
-    main.appendChild(buildTopbar());
-    main.appendChild(buildStrip());
+    var rail = buildRail();
+    var side = buildSidebar();
+    var top = buildTopbar();
+    var strip = buildStrip();
+    app.appendChild(rail);
+    app.appendChild(side);
+    main.appendChild(top);
+    main.appendChild(strip);
     main.appendChild(content);
     app.appendChild(main);
 
     document.body.appendChild(app);
 
+    /* Switching workspace rebuilds the four pieces that carry its identity — the agents in
+       the rail, the navigation, the breadcrumb and the market strip — then lands on a surface
+       that exists in the new one. The content area re-renders through the router as usual. */
+    GD.onWs(function (next) {
+      var r2 = buildRail(), s2 = buildSidebar(), t2 = buildTopbar(), p2 = buildStrip();
+      app.replaceChild(r2, rail); rail = r2;
+      app.replaceChild(s2, side); side = s2;
+      main.replaceChild(t2, top); top = t2;
+      main.replaceChild(p2, strip); strip = p2;
+      var cur = GD.current();
+      var def = GD.routes()[cur];
+      if (!def || !allowed(def)) GD.go(firstAllowed());
+      else GD.go(cur);
+      GD.toast(next.name, { icon: "globe" });
+    });
+
     GD.onRoute(function (key, def) {
+      /* A hash naming a surface this workspace does not serve — a bookmark, or a reload after
+         switching — lands on the first one it does rather than on an empty screen. */
+      if (!allowed(def)) {
+        var fall = firstAllowed();
+        if (fall !== key) { GD.go(fall, true); return; }
+      }
       qsa(".nav-item").forEach(function (n) {
         if (n.getAttribute("data-route") === key) n.setAttribute("aria-current", "page");
         else n.removeAttribute("aria-current");

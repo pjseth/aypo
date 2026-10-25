@@ -180,3 +180,149 @@ Guard calls to the other one: `if (GD.showCargo) GD.showCargo(c);`
 - `dropped_quote` is a real quote the existing Power Automate flow lost.
 - The position is **−$378,749** and breached its −$25,000 loss cut on 2 Oct.
 - Advisor success fees run ~**$27,500 a cargo**, ~**$275,000 a year**.
+
+---
+
+# Materials, workspaces and the three procurement surfaces
+
+Everything above describes the wheat desk and is unchanged. This section describes what was
+added in `v2-urc-essentials` so the product can carry a second customer's book: a material
+entity with price drivers, two workspaces, and three surfaces that are driven entirely by
+whichever workspace is active.
+
+## Workspaces
+
+`window.WS` is a second generated global, alongside `window.DESK`. It holds the workspaces.
+
+```
+as_of           "2026-10-13"
+fx              { "USD": {"PHP": 58.20, …}, "EUR": {…}, … }   // mocked mids
+fx_note         the sentence every screen prints next to a converted figure
+workspaces[]    { key, name, short, country, home_currency, demo, blurb,
+                  instruments|null, materials[], suppliers[], quotes[],
+                  has_spend_sample, bulletin_cadence_days }
+```
+
+Two of them:
+
+| key | who | currency | surfaces |
+| --- | --- | --- | --- |
+| `ufm` | United Flour Mill — the wheat desk | USD | the original seven, plus the three new ones |
+| `urc` | "Demo: PH Food Manufacturer" — fictional | PHP | the three new ones |
+
+`ufm` is the **default**: a fresh load of the app is the product the mill already uses. The
+switcher is the sidebar head. The choice is kept in `localStorage` under
+`graindesk-workspace`.
+
+### A surface declares the workspaces it serves
+
+```js
+GD.route("pricecheck", { label: "Price check", group: "Procurement", ws: ["ufm", "urc"], … });
+```
+
+**A route with no `ws` belongs to the wheat desk** — which is every surface that existed
+before materials did, so none of them needed editing. `app.js` filters the sidebar and the
+command palette on it, and redirects a hash naming a surface this workspace does not serve.
+
+### Reading the workspace
+
+A surface captures `window.DESK` at load time, which is fine because `DESK` never changes.
+The **active workspace does change**, so read it inside `render()`, never at load:
+
+```js
+render: function (wrap) {
+  var ws = GD.ws();          // the active workspace — read it here, not at the top of the file
+  …
+}
+```
+
+| Helper | Returns |
+| --- | --- |
+| `GD.ws()` / `GD.wsKey()` / `GD.wsAll()` | the active workspace, its key, all of them |
+| `GD.setWs(key)` / `GD.onWs(fn)` | switch, and be told when it switched |
+| `GD.wsAsOf()` | the dataset's "today" — pass it as the second argument to `fmt.ago` |
+| `GD.wsInstruments()` | the active workspace's market feeds (`DESK.instruments` for `ufm`) |
+| `GD.material(id)` / `GD.supplier(id)` | lookups, with `GD.materialName` / `GD.supplierName` |
+| `GD.fx(from, to)` / `GD.fxTable()` / `GD.fxNote()` | the mocked rate table |
+| `GD.cur(v, code, dp)` / `GD.curM(v, code)` / `GD.curSigned(…)` | ₱ € RM alongside `fmt.usd` |
+| `GD.curUnit(v, material)` / `GD.curUnitSigned(…)` | the same, at the material's own precision |
+| `GD.demoChip()` | the "Demo data" chip, or `null` in a real workspace |
+
+**Precision is a property of the material, not of the figure.** `GD.unitDp` reads the scale
+off what the material is worth per unit, so a band that is ₱872 wide does not print two
+decimals beside a price of ₱269,405 that prints none. Use `GD.curUnit` for anything measured
+per unit of material.
+
+## Materials and drivers
+
+```
+material        { id, name, category "raw"|"packaging", unit "MT"|"kg", currency,
+                  budget_price|null, budget_note, crop|null, drivers[] }
+driver          { key, name, source, unit, currency, per_unit, offset,
+                  kind "index"|"freight"|"spread", mocked, note, dates[], values[] }
+quote           { id, material_id, supplier_id, date, price, currency, unit, qty,
+                  valid_to, source, source_ref }
+supplier        { id, name, country, materials[], aliases[] }
+```
+
+One leg per driver, in the material's currency per material unit:
+
+```
+leg         = (print_in_force × per_unit + offset) × fx(driver.currency → material.currency)
+driverCost  = Σ legs
+premium     = quote.price − driverCost
+```
+
+FX is **not** a fourth addend — it is a named multiplier on each leg that needs one, so the
+legs plus the premium equal the quote price by construction. `budget_price: null` is a real
+state (the wheat desk holds no budget rate) and every screen handles it rather than printing
+a dash.
+
+### `GD.pricing` — pure, no DOM, tested in `tools/lib_tests.js`
+
+| Call | Returns |
+| --- | --- |
+| `legs(material, date, fx?)` | one row per driver with every intermediate figure kept |
+| `driverCost(material, date)` · `breakdown(material, quote)` | the sum, and the whole split with `reconciles` |
+| `premiums(material, quotes, asOf, months?)` | every supplier's premium in the window |
+| `band(material, quotes, date, asOf)` | `{established, low, high, p25, p75, median, n}` |
+| `position(price, band)` · `outside(price, band)` | `"below"`/`"inside"`/`"above"`/`"unknown"`, and the distance |
+| `budgetGap(material, price)` | `{budget, amount, pct, over}` or `null` |
+| `premiumSeries(…)` · `premiumTrend(…)` | the history chart, and the quarterly run of widening |
+| `assess(material, quote, quotes, asOf)` | all of the above for one quote, in one call |
+| `latestPerSupplier(materialId, quotes)` | the live board, cheapest first |
+
+Below **four** observations there is no band at all: quartiles of three numbers describe
+noise, and somebody would negotiate against them.
+
+### `GD.spendlib` — also pure, also tested
+
+`parseDelimited` · `parseXlsx` · `readFile` · `mapColumns` · `index` · `matchSupplier` ·
+`classify` · `process` · `resolve` · `setUnclassified` · `reviewGroups` · `report` ·
+`loadLearned` / `saveLearned`. `report()` carries `checks[]` and `reconciles`, and the report
+on screen prints both.
+
+### `GD.llm` — the only place the app talks to a model
+
+`available()` · `complete()` · `verifyNumbers(text, facts)` · `draft(cfg)` · `statusLine()`.
+
+**Call `draft()`, never `complete()`.** It always resolves — never rejects — with
+`{text, source: "model"|"template", note}`. With no key it returns the deterministic
+template; with a key it calls `claude-opus-5`, then checks every number in the reply against
+the fact pack and falls back to the template if one of them is not traceable. The note says
+which path ran and why.
+
+### `GD.export` helpers
+
+`GD.copyText` · `GD.downloadText` / `downloadMarkdown` / `downloadCsv` · `GD.printDoc(title,
+html)` (print-to-PDF through a hidden iframe) · `GD.editor(text, opts)`.
+
+## Checks
+
+```bash
+py -3.11 tools/build_ws.py        # regenerate ws.js, spend_sample.js and app/data/*
+py -3.11 tools/test_lib.py        # the price math and the spend reconciliation
+py -3.11 tools/test_app.py        # every route in every workspace
+py -3.11 tools/test_flows.py      # the three flows, driven through the real DOM
+py -3.11 tools/shots.py           # screenshots of the states worth looking at
+```

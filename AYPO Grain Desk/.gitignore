@@ -3,7 +3,7 @@ evidence/frames/
 evidence/*.mp4
 __pycache__/
 *.pyc
-data/
+/data/
 docs/_print.html
 docs/_shot.png
 docs/_test.pdf
@@ -15,3 +15,10 @@ app/_shell*.png
 _jscheck.html
 .claude/
 app/_*.html
+
+# An API key baked in by tools/make_env.py. The stub was committed with `git add -f`;
+# everything written over it afterwards stays local.
+app/js/env.js
+
+# test harness pages
+/_libtest.html
