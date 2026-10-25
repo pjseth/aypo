@@ -523,60 +523,36 @@
     counter.style.setProperty("box-shadow", "var(--sh-md)");
     out.push(counter);
 
-    /* --- by category, as a composition plus the figures */
-    var catBar = GD.compo(rep.byCategory.map(function (g) {
-      return { name: g.label, value: g.amount, color: catColor(g.key) };
-    }).filter(function (p) { return p.value > 0; }), rep.total);
-    catBar.style.setProperty("height", "26px");
-    catBar.style.setProperty("border-radius", "var(--r-ctl)");
-
-    /* --- by month */
-    var monthBars = rep.byMonth.length ? GD.chart.groupedBars({
-      groups: rep.byMonth.map(function (g) {
-        return { label: fmt.dateShort(g.key + "-01"), values: [g.amount] };
-      }),
-      names: [{ name: "Spend", color: "var(--accent)" }],
-      w: 620, h: 210,
-      fmtY: function (v) { return money(v, cur); },
-      fmtTip: function (v) { return GD.cur(v, cur, 0); },
-      label: "Spend by month"
-    }) : el("div", { class: "empty" }, [el("div", { text: "No dated lines." })]);
-
-    out.push(el("div", { class: "grid g-2" }, [
-      GD.card({
-        title: "By category",
-        sub: "Raw materials, packaging, and anything that could not be classified",
-        body: [el("div", { style: { display: "grid", gap: "13px" } }, [
-          catBar,
-          GD.kv(rep.byCategory.map(function (g) {
-            return [g.label, el("span", null, [
-              el("b", { text: GD.cur(g.amount, cur, 0) }),
-              el("span", {
-                style: { color: "var(--ink-3)", "margin-left": "7px", "font-weight": "400" },
-                text: fmt.pct(rep.total ? g.amount / rep.total : 0, 1) + " · " +
-                      fmt.n(g.lines, 0) + " lines"
-              })
-            ])];
-          }))
-        ])],
-        foot: [el("span", { style: { color: "var(--ink-3)" },
-          text: "Unclassified lines stay in the total. Dropping them is how a report stops " +
-                "matching the ledger." })]
-      }),
-      GD.card({
-        title: "By month",
-        sub: rep.byMonth.length + " months in the file",
-        body: [monthBars]
-      })
-    ]));
+    /* The by-category and by-month cards that used to sit here are gone, and by-supplier
+       with them. Every spend cube produces those; they are table stakes, and URC already has
+       an initiative in flight for exactly that. All three are still in the exported report
+       CSV for anybody who wants to pivot on them. What is left on screen is the figure a
+       spend cube cannot produce, because it has no budget in it. */
 
     /* --- by material, with price paid against budget */
     var perUnitBy = {};
     rep.perUnit.forEach(function (p) { perUnitBy[p.material.id] = p; });
 
+    var catBar = GD.compo(rep.byCategory.map(function (g) {
+      return { name: g.label + " · " + GD.cur(g.amount, cur, 0), value: g.amount,
+               color: catColor(g.key) };
+    }).filter(function (p) { return p.value > 0; }), rep.total);
+    catBar.style.setProperty("height", "10px");
+    catBar.style.setProperty("width", "190px");
+
     out.push(GD.card({
       title: "By material",
       sub: "Spend, volume, and the price actually paid per unit against the budget rate",
+      actions: [
+        el("div", { style: { display: "grid", gap: "5px", "justify-items": "end" } }, [
+          catBar,
+          GD.legend(rep.byCategory.filter(function (g) { return g.amount > 0; })
+            .map(function (g) {
+              return { name: g.label + " " + fmt.pct(rep.total ? g.amount / rep.total : 0, 0),
+                       color: catColor(g.key) };
+            }))
+        ])
+      ],
       flush: true,
       body: [GD.table({
         cols: [
@@ -682,50 +658,6 @@
         el("span", { style: { color: "var(--ink-3)" },
           text: "Lines with no usable quantity contribute to spend but not to volume." })
       ]
-    }));
-
-    /* --- by supplier */
-    out.push(GD.card({
-      title: "By supplier",
-      sub: rep.bySupplier.length + " counterparties in the file",
-      flush: true,
-      body: [GD.table({
-        cols: [
-          { key: "label", label: "Supplier", tdClass: "strong", width: "230px" },
-          {
-            key: "amount", label: "Spend", num: true, tdClass: "strong", width: "130px",
-            render: function (g) { return GD.cur(g.amount, cur, 0); }
-          },
-          {
-            key: "share", label: "Share", num: true, width: "90px",
-            sortValue: function (g) { return g.amount; },
-            render: function (g) { return fmt.pct(rep.total ? g.amount / rep.total : 0, 1); }
-          },
-          {
-            key: "bar", label: "", sortable: false,
-            render: function (g) {
-              var pct = rep.total ? g.amount / rep.total : 0;
-              return el("div", {
-                style: { height: "8px", background: "var(--surface-3)",
-                         "border-radius": "var(--r-pill)", overflow: "hidden" }
-              }, [el("div", {
-                style: {
-                  width: Math.max(1, pct * 100).toFixed(2) + "%", height: "100%",
-                  background: g.key === "unknown" ? "var(--ink-4)" : "var(--accent)"
-                }
-              })]);
-            }
-          },
-          {
-            key: "lines", label: "Lines", num: true, width: "80px",
-            render: function (g) { return fmt.n(g.lines, 0); }
-          }
-        ],
-        rows: rep.bySupplier,
-        sortKey: "amount",
-        sortDir: "desc",
-        emptyText: "No suppliers resolved."
-      })]
     }));
 
     /* --- reconciliation, stated rather than assumed */
@@ -1085,8 +1017,8 @@
   GD.route("spend", {
     label: "Spend",
     icon: "dollar",
-    group: "Procurement",
-    ws: ["ufm", "urc"],
+    group: "Desk",
+    ws: ["urc"],
     badge: function () {
       if (!GD.spendRun) return null;
       return GD.spendRun.counts.review;

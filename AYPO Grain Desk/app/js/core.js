@@ -342,9 +342,12 @@
       svg.appendChild(t);
     }
     var step = Math.max(1, Math.floor(n / 6));
+    /* `fmtX` is optional: the default is right for a chart spanning weeks, and wrong for one
+       spanning a year, where "1 Oct" at both ends means two different Octobers. */
+    var fmtX = opts.fmtX || fmtDateShort;
     for (i = 0; i < n; i += step) {
       var tx = svgEl("text", { x: X(i).toFixed(2), y: h - 7, "text-anchor": "middle", class: "axis-l" });
-      tx.textContent = fmtDateShort(dates[i]);
+      tx.textContent = fmtX(dates[i]);
       svg.appendChild(tx);
     }
     series.forEach(function (s) {

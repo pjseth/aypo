@@ -3,6 +3,7 @@
    The route tests prove every page renders. These prove the things the brief actually asks
    for, by clicking the buttons a person would click:
 
+     · the market screen shows every feed, and hands a material to the price check
      · the planted coffee quote opens above its band, with the widening trend on screen, and
        the brief it generates contains no figure that is not in the fact table beside it
      · the messy sample processes end to end, the review queue clears in a handful of clicks,
@@ -66,13 +67,11 @@
   /* ============================================================== 1 · the price check */
 
   async function priceCheckFlow() {
-    GD.setWs("urc");
-    await wait(260);
     GD.go("pricecheck");
     await until(function () { return byText(".page-title", "Price check"); }, "the price check page");
 
     var ws = GD.ws();
-    ok("the workspace switched to the demo", ws.key === "urc", ws.key);
+    ok("the dashboard opens on the demo book", ws.key === "urc", ws.key);
     ok("the demo label is on the page", !!byText(".chip", "Demo data"));
 
     var coffee = GD.material("green_coffee", ws);
@@ -205,99 +204,55 @@
 
   /* ================================================================ 2 · the wheat desk */
 
-  async function wheatFlow() {
-    GD.setWs("ufm");
-    await wait(300);
-    GD.go("quotes");
-    await until(function () { return byText(".page-title", "Quote board"); }, "the quote board");
+  /* ================================================================ 2 · the market */
 
-    var D = window.DESK;
-    ok("the quote board still shows every indication",
-       (document.body.textContent || "").indexOf(D.quotes.length + " indications") >= 0,
-       D.quotes.length);
+  async function marketFlow() {
+    GD.go("prices");
+    await until(function () { return byText(".page-title", "Market"); }, "the market page");
+    var ws = GD.ws();
 
-    var q = D.quotes[0];
-    GD.showQuote(q);
-    var sh = await until(sheet, "the wheat quote sheet");
-    var t = textOf(sh);
-    ok("a wheat quote still opens its four-way split",
-       t.indexOf("Reconstructed composition") >= 0);
-    ok("the wheat residual is unchanged on screen",
-       t.indexOf(GD.fmt.usd(q.residual_usd_mt)) >= 0, GD.fmt.usd(q.residual_usd_mt));
+    var tiles = nodes(".wrap .grid.g-3 > button.card");
+    ok("there is a tile for every feed something is priced off", tiles.length >= 10,
+       tiles.length + " tiles");
+    var page = textOf(document.querySelector(".wrap"));
+    ok("the feeds name their source", page.indexOf("ICE Europe") >= 0);
+    ok("placeholder feeds are labelled on the tile", page.indexOf("mock") >= 0);
+
+    ok("the comparison chart drew", !!document.querySelector(".wrap svg.chart"));
+    ok("the chart says what it did to the units",
+       page.indexOf("indexed to 100") >= 0 || page.indexOf("Indexed to 100") >= 0);
+
+    ok("driver cost is reported for every material",
+       ws.materials.every(function (m) { return page.indexOf(m.name) >= 0; }));
+    ok("the bridge card is on the page",
+       page.indexOf("What that did to our materials") >= 0);
+
+    /* A feed opens its own history and says what it prices. */
+    tiles[0].click();
+    var fs = await until(sheet, "the feed sheet");
+    var ft = textOf(fs);
+    ok("a feed opens its twelve months", !!fs.querySelector("svg.chart"));
+    ok("the feed sheet says what it prices", ft.indexOf("What it prices") >= 0);
+    ok("the feed sheet names its source and unit", ft.indexOf("12-month range") >= 0);
     closeSheet();
     await wait(260);
 
-    /* The same wheat quote through the generic price model: the premium it reports has to be
-       the residual the board just showed, or the two screens disagree about one email. */
-    var wq = null;
-    GD.ws().quotes.forEach(function (x) { if (x.id === q.id) wq = x; });
-    ok("the wheat quote exists as a material quote", !!wq);
-    if (wq) {
-      var m = GD.material(wq.material_id, GD.ws());
-      var bd = GD.pricing.breakdown(m, wq);
-      ok("the generic premium equals the board's residual",
-         Math.abs(bd.premium - q.residual_usd_mt) < 0.011,
-         bd.premium + " vs " + q.residual_usd_mt);
-      ok("wheat carries no budget rate, and says so",
-         GD.pricing.budgetGap(m, wq.price) === null);
+    /* And the bridge hands a material to the price check. */
+    var row = document.querySelector(".wrap .card tbody tr");
+    ok("the material table is clickable", !!row);
+    if (row) {
+      row.click();
+      await until(function () { return byText(".page-title", "Price check"); },
+                  "the price check after the hand-off");
+      await wait(300);
+      var count = textOf(byText(".card", "showing"));
+      ok("the hand-off filtered the quote board to one material",
+         /showing \d+ of/.test(count) && GD.qs("select.field").value !== "all",
+         GD.qs("select.field").value);
     }
-
-    ok("Night Watch is still in the topbar on the wheat desk",
-       !!byText(".topbar button", "Night Watch"));
-
-    /* The thin-history path: a wheat class with only a couple of quotes must refuse to draw
-       a band rather than quartile three numbers. */
-    var thin = null;
-    GD.ws().materials.forEach(function (m) {
-      if (thin) return;
-      var b = GD.pricing.band(m, GD.ws().quotes, GD.wsAsOf(), GD.wsAsOf());
-      if (!b.established) thin = m;
-    });
-    ok("a material with too little history has no band", !!thin,
-       thin ? thin.name : "every wheat class has four or more quotes");
-    if (thin) {
-      var tq = GD.pricing.latestPerSupplier(thin.id, GD.ws().quotes)[0];
-      GD.showPriceCheck(tq, GD.ws());
-      var ts = await until(sheet, "the thin-history sheet");
-      ok("the thin-history sheet says there is no band yet",
-         textOf(ts).indexOf("No band yet") >= 0);
-      ok("the thin-history sheet still shows the breakdown",
-         textOf(ts).indexOf("the quoted price exactly") >= 0);
-      ok("the thin-history sheet says no budget is held",
-         textOf(ts).indexOf("No budget rate held for this material") >= 0);
-      closeSheet();
-      await wait(260);
-    }
-
-    /* And the bulletin on the wheat desk, whose driver legs are held at an observed
-       settlement rather than a moving monthly print. */
-    GD.go("bulletin");
-    await until(function () { return byText(".page-title", "Market bulletin"); },
-                "the wheat bulletin page");
-    byText("button", "Generate draft").click();
-    var wcard = await until(function () { return byText(".card-title", "The draft"); },
-                           "the wheat draft", 20000);
-    var wtext = wcard.closest(".card").querySelector("textarea").value;
-    ok("the wheat desk gets a bulletin too", wtext.length > 1000, wtext.length);
-    ok("it says where a leg is pegged rather than tracking the market",
-       wtext.indexOf("held at the") >= 0 || wtext.indexOf("no new print since") >= 0 ||
-       wtext.indexOf("unchanged since") >= 0,
-       (wtext.match(/held at the[^.]{0,60}/) || [""])[0]);
-    ok("it does not claim wheat is a non-agricultural input",
-       wtext.indexOf("is not an agricultural input") < 0);
-    ok("it says where the wheat crop read actually lives",
-       wtext.indexOf("lives on the Market surface") >= 0);
-    ok("it does not invoke a budget the wheat desk does not hold",
-       wtext.indexOf("against both the band and the budget") < 0);
-    byText("button", "Discard").click();
-    await wait(200);
   }
 
-  /* ================================================================== 3 · the spend run */
-
   async function spendFlow() {
-    GD.setWs("urc");
-    await wait(300);
     GD.go("spend");
     await until(function () { return byText(".page-title", "Spend cleansing"); },
                 "the spend page");
@@ -506,7 +461,7 @@
       await wait(400);
       await priceCheckFlow();
       await resinFlow();
-      await wheatFlow();
+      await marketFlow();
       await spendFlow();
       await bulletinFlow();
       finish();

@@ -510,10 +510,10 @@
   }
 
   GD.route("bulletin", {
-    label: "Market bulletin",
+    label: "Bulletin",
     icon: "file",
-    group: "Procurement",
-    ws: ["ufm", "urc"],
+    group: "Desk",
+    ws: ["urc"],
     badge: function () {
       var due = GD.bulletinDue();
       if (!due) return null;
@@ -536,63 +536,28 @@
           el("h1", { class: "page-title", text: "Market bulletin" }),
           el("div", {
             class: "page-sub",
-            text: "One page per material every " + w.cadence + " days: what the drivers did, " +
-                  "FX and freight, the crop read, and a plain line on what it means for buying"
+            text: "Issued every " + w.cadence + " days — one page per material: what the " +
+                  "drivers did, FX and freight, the crop read, and a plain line on what it " +
+                  "means for buying"
           })
         ]),
         el("div", { class: "ph-actions" }, [
           GD.demoChip(),
-          GD.chip("every " + w.cadence + " days", "outline", "clock"),
+          GD.chip(lastIssued(ws.key) ? "last issued " + fmt.dateShort(lastIssued(ws.key))
+                                     : "no previous issue", "outline", "clock"),
           GD.chip(due.days <= 0 ? "due now" : "due in " + due.days + " days",
-            due.days <= 0 ? "warn" : "outline", "calendar")
+            due.days <= 0 ? "warn" : "outline", "calendar"),
+          draft ? GD.chip(
+            statusOf() === "approved" ? "approved"
+              : statusOf() === "edited" ? "edited since approval" : "draft",
+            statusOf() === "approved" ? "good"
+              : statusOf() === "edited" ? "warn" : "outline",
+            statusOf() === "approved" ? "check" : "eye") : null
         ])
       ]));
 
-      /* ---------------------------------------------------------------- 2 · stats */
-      var state = statusOf();
-      wrap.appendChild(el("div", { class: "grid g-4" }, [
-        GD.stat({
-          label: "Last issued", icon: "calendar",
-          value: lastIssued(ws.key) ? fmt.dateShort(lastIssued(ws.key)) : "no record",
-          unit: lastIssued(ws.key) ? fmt.date(lastIssued(ws.key)).slice(-4) : "",
-          delta: [el("span", {
-            text: w.assumed
-              ? "Period assumed as one cadence back, to " + fmt.date(w.from)
-              : "This draft covers " + fmt.date(w.from) + " onward"
-          })]
-        }),
-        GD.stat({
-          label: "Sections", icon: "layers",
-          value: draft ? String(draft.doc.sections.length) : String(ws.materials.length + 1),
-          unit: "in the bulletin",
-          delta: [
-            el("b", { text: String(ws.materials.length) }),
-            el("span", { class: "nowrap", text: "materials, plus the market overview" })
-          ]
-        }),
-        GD.stat({
-          label: "Gaps declared", icon: "alert",
-          value: draft ? String(draft.doc.gaps) : "—",
-          unit: draft ? "sections with no data" : "generate to see",
-          delta: [el("span", {
-            text: draft && draft.doc.gaps
-              ? "Each one says so in words rather than carrying an estimate"
-              : "A feed with no print for the period is stated, never filled"
-          })]
-        }),
-        GD.stat({
-          label: "State", icon: state === "approved" ? "check" : "eye",
-          hero: state === "approved",
-          value: state === "none" ? "not drafted" : state === "draft" ? "draft"
-            : state === "edited" ? "edited" : "approved",
-          delta: [el("span", {
-            text: state === "approved"
-              ? "Cleared for export"
-              : state === "edited" ? "Changed since it was approved — approve it again"
-              : "Export is blocked until a person approves it"
-          })]
-        })
-      ]));
+      /* The stat row that used to sit here is gone: "Sections — 9" is not information.
+         Its three useful figures are in the header chips above, which cost no height. */
 
       /* ------------------------------------------------------- 3 · generate / status */
       if (!draft) {

@@ -39,7 +39,6 @@ except Exception:
 
 
 APP_ORDER = [
-    "app/js/data.js",
     "app/js/ws.js",
     "app/js/spend_sample.js",
     "app/js/env.js",
@@ -49,13 +48,7 @@ APP_ORDER = [
     "app/js/pricing.js",
     "app/js/spendlib.js",
     "app/js/llm.js",
-    "app/js/surfaces/brief.js",
-    "app/js/surfaces/quotes.js",
-    "app/js/surfaces/position.js",
-    "app/js/surfaces/market.js",
-    "app/js/surfaces/cargo.js",
-    "app/js/surfaces/margin.js",
-    "app/js/surfaces/savings.js",
+    "app/js/surfaces/prices.js",
     "app/js/surfaces/pricecheck.js",
     "app/js/surfaces/spend.js",
     "app/js/surfaces/bulletin.js",

@@ -1109,19 +1109,11 @@
 
   /* ===================================================================== the surface */
 
-  function uniq(list) {
-    var seen = {}, out = [];
-    list.forEach(function (v) {
-      if (!Object.prototype.hasOwnProperty.call(seen, v)) { seen[v] = true; out.push(v); }
-    });
-    return out;
-  }
-
   GD.route("pricecheck", {
     label: "Price check",
     icon: "scale",
-    group: "Procurement",
-    ws: ["ufm", "urc"],
+    group: "Desk",
+    ws: ["urc"],
     badge: function () {
       var ws = GD.ws();
       if (!ws) return null;
@@ -1191,19 +1183,6 @@
       ]));
 
       /* --------------------------------------------------------------- 2 · stats */
-      var statLive = GD.stat({
-        label: "Live quotes", value: fmt.n(live.length, 0), unit: "on the board", icon: "quotes",
-        delta: [
-          el("span", { text: "From" }),
-          el("b", { text: fmt.n(ws.quotes.length, 0) }),
-          el("span", { class: "nowrap", text: "in the 12-month history" })
-        ]
-      });
-      GD.tipOn(statLive, "<b>The live board</b><div class='tip-mute'>The most recent quote " +
-        "from each supplier of each material — what a buyer is actually holding when the " +
-        "phone rings. The twelve-month history behind it is what the fair band is drawn " +
-        "from.</div>");
-
       var statAbove = GD.stat({
         label: "Above the fair band", value: fmt.n(above.length, 0),
         unit: "of " + live.length, icon: "alert",
@@ -1241,8 +1220,8 @@
         "quantity offered. It is the size of the conversation, not a saving already made — " +
         "and converted to " + GD.esc(recoverCur) + " at the indicative mid.</div>");
 
-      wrap.appendChild(el("div", { class: "grid g-4" }, [
-        statLive, statAbove, statBudget, statRecover
+      wrap.appendChild(el("div", { class: "grid g-3" }, [
+        statAbove, statBudget, statRecover
       ]));
 
       /* --------------------------------------------- 3 · the headline, if there is one */
@@ -1318,22 +1297,15 @@
       }
 
       /* ------------------------------------------------------------- 4 · filters */
-      var state = { material: "all", supplier: "all", pos: "all", scope: "live", q: "" };
+      var state = { material: "all", pos: "all", scope: "live" };
       var table;
 
       function pool() { return state.scope === "live" ? live : ws.quotes; }
 
       function filtered() {
-        var needle = state.q.trim().toLowerCase();
         return pool().filter(function (q) {
           if (state.material !== "all" && q.material_id !== state.material) return false;
-          if (state.supplier !== "all" && q.supplier_id !== state.supplier) return false;
           if (state.pos !== "all" && assess(q).position !== state.pos) return false;
-          if (needle) {
-            var hay = (GD.materialName(q.material_id, ws) + " " +
-              GD.supplierName(q.supplier_id, ws) + " " + (q.source_ref || "")).toLowerCase();
-            if (hay.indexOf(needle) < 0) return false;
-          }
           return true;
         }).sort(function (x, y) { return x.date < y.date ? 1 : x.date > y.date ? -1 : 0; });
       }
@@ -1353,8 +1325,7 @@
       function sync(n) {
         var next = "showing " + fmt.n(n, 0) + " of " + fmt.n(pool().length, 0);
         if (countNode.textContent !== next) countNode.textContent = next;
-        var dirty = state.material !== "all" || state.supplier !== "all" ||
-                    state.pos !== "all" || state.q !== "";
+        var dirty = state.material !== "all" || state.pos !== "all";
         if (dirty) clearBtn.removeAttribute("disabled");
         else clearBtn.setAttribute("disabled", "");
       }
@@ -1386,35 +1357,25 @@
         })
       ));
 
-      var supSel = el("select", {
-        class: "field", "aria-label": "Filter by supplier",
-        onchange: function () { state.supplier = supSel.value; apply(); }
-      }, [el("option", { value: "all", text: "All suppliers" })].concat(
-        ws.suppliers.filter(function (s) {
-          return ws.quotes.some(function (q) { return q.supplier_id === s.id; });
-        }).map(function (s) {
-          var n = ws.quotes.filter(function (q) { return q.supplier_id === s.id; }).length;
-          return el("option", { value: s.id, text: s.name + "  (" + n + ")" });
-        })
-      ));
-
-      var textIn = el("input", {
-        class: "field", type: "text", autocomplete: "off",
-        placeholder: "Filter material or supplier…",
-        "aria-label": "Filter by material or supplier",
-        oninput: function () { state.q = textIn.value; apply(); }
-      });
-      textIn.style.setProperty("flex", "1 1 180px");
-      textIn.style.setProperty("min-width", "150px");
-
       function clearAll() {
-        state.material = "all"; state.supplier = "all"; state.pos = "all"; state.q = "";
-        matSel.value = "all"; supSel.value = "all"; textIn.value = "";
+        state.material = "all"; state.pos = "all";
+        matSel.value = "all";
         GD.qsa("button", posSeg).forEach(function (b, i) {
           b.setAttribute("aria-pressed", String(i === 0));
         });
         apply();
       }
+
+      /* How the Market surface and the command palette hand a material over. */
+      GD.filterPriceCheck = function (materialId) {
+        state.material = materialId;
+        matSel.value = materialId;
+        apply();
+        var m = GD.material(materialId, ws);
+        if (m) GD.toast("Filtered to " + m.name, { icon: "filter" });
+        var content = GD.qs(".content");
+        if (content) content.scrollTop = 0;
+      };
       function divider() {
         return el("span", {
           "aria-hidden": "true",
@@ -1436,8 +1397,6 @@
             posSeg,
             divider(),
             matSel,
-            supSel,
-            textIn,
             countNode,
             clearBtn
           ])
@@ -1478,26 +1437,6 @@
         {
           key: "price", label: "Quoted", num: true, tdClass: "strong", width: "104px",
           render: function (q) { return price(q.price, matById[q.material_id]); }
-        },
-        {
-          key: "premium", label: "Premium", num: true, width: "104px",
-          sortValue: function (q) { return assess(q).premiumPct; },
-          render: function (q) {
-            var a = assess(q), m = matById[q.material_id];
-            var n = el("span", null, [
-              el("span", { text: price(a.breakdown.premium, m) }),
-              el("span", {
-                style: { color: "var(--ink-4)", "margin-left": "5px", "font-size": "var(--t-xs)" },
-                text: a.premiumPct === null ? "" : fmt.pct(a.premiumPct, 1)
-              })
-            ]);
-            GD.tipOn(n, "<b>Premium over driver cost</b>" +
-              "<div class='tip-row'><span class='tip-mute'>driver cost</span><b>" +
-              GD.esc(price(a.breakdown.driverCost, m)) + "</b></div>" +
-              "<div class='tip-row'><span class='tip-mute'>quoted</span><b>" +
-              GD.esc(price(q.price, m)) + "</b></div>");
-            return n;
-          }
         },
         {
           key: "band", label: "vs band", width: "138px",
@@ -1585,116 +1524,9 @@
         ]
       }));
 
-      /* --------------------------------------------------- 6 · materials and drivers */
-      var matRows = ws.materials.map(function (m) {
-        var qs = ws.quotes.filter(function (q) { return q.material_id === m.id; });
-        var sups = uniq(qs.map(function (q) { return q.supplier_id; }));
-        var liveQs = P.latestPerSupplier(m.id, ws.quotes);
-        var band = P.band(m, ws.quotes, asOf, asOf);
-        return {
-          m: m, quotes: qs.length, suppliers: sups.length,
-          live: liveQs, band: band,
-          lo: liveQs.length ? liveQs[0].price : null,
-          hi: liveQs.length ? liveQs[liveQs.length - 1].price : null
-        };
-      });
-
-      wrap.appendChild(GD.card({
-        title: "Materials and their drivers",
-        sub: "What each material is priced off, and the budget rate it is measured against",
-        flush: true,
-        body: [GD.table({
-          cols: [
-            {
-              key: "name", label: "Material", tdClass: "strong", width: "160px",
-              sortValue: function (r) { return r.m.name; },
-              render: function (r) {
-                return el("div", null, [
-                  el("div", { text: r.m.name }),
-                  el("div", {
-                    style: { "font-size": "var(--t-xs)", color: "var(--ink-3)",
-                             "font-weight": "400" },
-                    text: r.m.category === "packaging" ? "Packaging" : "Raw material"
-                  })
-                ]);
-              }
-            },
-            {
-              key: "drivers", label: "Priced off", sortable: false,
-              render: function (r) {
-                return el("div", { style: { display: "grid", gap: "3px" } },
-                  r.m.drivers.map(function (d) {
-                    var row = el("div", { class: "flex items-center gap-8" }, [
-                      el("i", {
-                        style: {
-                          width: "8px", height: "8px", "border-radius": "2px", flex: "none",
-                          "background-color": legColor(d)
-                        }
-                      }),
-                      el("span", { text: d.name }),
-                      d.mocked ? GD.chip("mock", "outline") : null
-                    ]);
-                    GD.tipOn(row, "<b>" + GD.esc(d.name) + "</b><div class='tip-mute'>" +
-                      GD.esc(d.source + " · " + d.unit) + "</div><div class='tip-mute'>" +
-                      GD.esc(d.note) + "</div>");
-                    return row;
-                  }));
-              }
-            },
-            {
-              key: "budget", label: "Budget", num: true, width: "110px",
-              sortValue: function (r) { return r.m.budget_price; },
-              render: function (r) {
-                if (r.m.budget_price === null || r.m.budget_price === undefined) {
-                  var n = el("span", { class: "val-mute", text: "none set" });
-                  GD.tipOn(n, GD.esc(r.m.budget_note));
-                  return n;
-                }
-                return price(r.m.budget_price, r.m);
-              }
-            },
-            {
-              key: "band", label: "Fair band", num: true, width: "150px",
-              sortValue: function (r) { return r.band.established ? r.band.low : -1; },
-              render: function (r) {
-                if (!r.band.established) {
-                  return el("span", { class: "val-mute", text: r.band.n + " quotes — no band" });
-                }
-                return price(r.band.low, r.m) + " – " + price(r.band.high, r.m);
-              }
-            },
-            {
-              key: "live", label: "Live range", num: true, width: "150px",
-              sortValue: function (r) { return r.lo; },
-              render: function (r) {
-                if (!r.live.length) return el("span", { class: "val-mute", text: "—" });
-                return price(r.lo, r.m) + " – " + price(r.hi, r.m);
-              }
-            },
-            {
-              key: "suppliers", label: "Suppliers", num: true, width: "88px",
-              render: function (r) { return fmt.n(r.suppliers, 0); }
-            }
-          ],
-          rows: matRows,
-          sortKey: "name",
-          onRow: function (r) {
-            state.material = r.m.id;
-            matSel.value = r.m.id;
-            apply();
-            GD.toast("Filtered to " + r.m.name, { icon: "filter" });
-            var content = GD.qs(".content");
-            if (content) content.scrollTop = 0;
-          },
-          emptyText: "No materials in this workspace."
-        })],
-        foot: [
-          el("span", { style: { color: "var(--ink-3)" },
-            text: "Click a material to filter the quote table above it." }),
-          el("span", { style: { color: "var(--ink-4)" }, text: "·" }),
-          el("span", { style: { color: "var(--ink-3)" }, text: GD.fxNote() })
-        ]
-      }));
+      /* The materials-and-drivers reference table that used to sit here now lives on
+         the Market surface, next to what those drivers have actually done. It was
+         reference data on a decision screen; it belongs with the decision it informs. */
 
       sync(filtered().length);
     }

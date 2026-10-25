@@ -1,24 +1,39 @@
 # Grain Desk
 
-A wheat procurement desk for United Flour Mill, Thailand — built from a 71-minute walkthrough
-with Pavin Sethbhakdi, who buys the wheat.
+A procurement desk for a buyer with many materials and no independent view of what any of
+them should cost.
 
-Three things live here: the **evidence** recovered from the recording, the **design proposal**
-that came out of it, and the **working dashboard** that implements it.
+Four screens, in the order the questions actually get asked:
+
+| | | |
+| --- | --- | --- |
+| **Market** | what are prices doing | every feed that sets the floor under a material, and what it did to that floor |
+| **Price check** | what should I be paying | a quote split into its published drivers and the premium the supplier is carrying, against the fair band and the budget |
+| **Spend** | what did I actually pay | the S/4HANA export cleaned in the browser, and the price paid per unit against budget |
+| **Bulletin** | what do I tell everyone | the fortnightly market bulletin, edited and approved before it can be exported |
+
+> **Branches.** This is `v3-dashboard`. The desk began as a wheat book for one Thai flour
+> mill, built from a 71-minute walkthrough with the buyer; that version — seven surfaces, its
+> own data, its own evidence — is on **`v2-urc-essentials`**, where it still runs unchanged.
+> None of it is loaded here. A dashboard that carries a second customer's screens around
+> unreachably is not a simpler dashboard.
+>
+> The evidence and the design proposal below are from that original work and are still what
+> this is built on.
 
 ```bash
 # the app — no build step, no dependencies, no server required
 start app/index.html          # or: open app/index.html
 
-# rebuild the datasets
-py -3.11 tools/build_data.py             # the wheat desk       -> app/js/data.js
-py -3.11 tools/build_ws.py               # materials, workspaces -> app/js/ws.js + the spend sample
+# rebuild the dataset
+py -3.11 tools/build_ws.py               # materials, feeds, quotes, and the spend sample
+py -3.11 tools/build_data.py             # the wheat fixture the price model is checked against
 
 # checks
 py -3.11 tools/jscheck.py --app          # every script parses and runs
 py -3.11 tools/test_lib.py               # the price math and the spend reconciliation
-py -3.11 tools/test_app.py               # every route, in every workspace
-py -3.11 tools/test_flows.py             # the three new flows, driven through the real DOM
+py -3.11 tools/test_app.py               # every route renders clean
+py -3.11 tools/test_flows.py             # the four flows, driven through the real DOM
 py -3.11 tools/shots.py                  # screenshots of the states worth looking at
 py -3.11 tools/dump.py bulletin          # print a generated document, to read it
 ```
@@ -36,21 +51,20 @@ fetched, so the whole thing runs correctly from `file://` as well as from a host
 | `app/css/tokens.css` | Palette, type scale, radii, elevation, motion. |
 | `app/css/app.css` | Shell and components. |
 | `app/js/core.js` | DOM helpers, icon set, formatting, charts, overlays, router, table. |
-| `app/js/workspace.js` | Which customer's book is on screen, and currency formatting. |
+| `app/js/workspace.js` | Whose book is on screen, currency formatting, and the precision rule. |
 | `app/js/pricing.js` | Driver legs, premium, fair band, budget gap. Pure functions. |
 | `app/js/spendlib.js` | CSV and xlsx reading, vendor and material matching, the report. Pure. |
 | `app/js/llm.js` | The one door to a model, with the number check behind it. |
-| `app/js/export.js` | Copy, download, print-to-PDF, the shared editor. |
-| `app/js/app.js` | Rail, sidebar, topbar, market strip, command palette, Night Watch. |
+| `app/js/export.js` | Copy, download, print-to-PDF, the shared editor and document renderer. |
+| `app/js/app.js` | Rail, sidebar, topbar, market strip, command palette, routing. |
 | `app/js/surfaces/*.js` | One file per screen, registered through `GD.route()`. |
-| `app/js/data.js`, `app/js/ws.js`, `app/js/spend_sample.js` | Generated. Do not edit by hand. |
+| `app/js/ws.js`, `app/js/spend_sample.js` | Generated. Do not edit by hand. |
 | `app/data/spend_sample.csv` / `.xlsx` | The messy export, as a file you can actually upload. |
 | `app/SURFACE_CONTRACT.md` | The API a surface codes against, and the data shape. |
 
-Seven surfaces for the wheat desk: Morning Brief, Quote Board, Position Book, Market, Cargo &
-docs, Blend & margin, Savings & benchmark. Night Watch is deliberately **not** a surface — it
-is an interrupt, because that is what it is in Pavin's life. Three more sit under
-**Procurement** and work on any material: Price check, Spend, Market bulletin.
+Four surfaces — `prices`, `pricecheck`, `spend`, `bulletin` — and three agents in the rail
+that own them: **The Watch** (the feeds and the fortnightly clock), **The Buyer** (what a
+quote is made of) and **The Clerk** (what was actually invoiced).
 
 ### Where the look comes from
 
@@ -87,16 +101,12 @@ Two figures worth knowing before reading the code:
 - On both quotes that *do* carry a stated basis, the reconstruction lands within **$1/t** of it
   (−0.95 and +1.02). That is the evidence the model is sound, and it is shown in the UI.
 
-## A second customer: materials, not wheat
+## The three problems this was built for
 
 
-`v2-urc-essentials` extends the desk from one mill's wheat book to any material with a
-published price driver, for a prospective customer who buys about 3,000 suppliers' worth of
-coffee, potato flakes, resin and cartons. **The wheat desk is untouched.** `app/js/data.js`
-and the seven surface files are not modified; `app.js` changes only where it has to carry two
-workspaces, and `ufm` is the default, so a fresh load is the product the mill already uses.
-
-Three features, each one answering something URC's head of procurement actually said.
+A Philippine food manufacturer: about ten plants, a 22-person central procurement team, three
+thousand suppliers, thirty thousand SKUs, and about 60% of raw materials imported. Their head
+of procurement named three problems. Each screen exists for one of them.
 
 ### Price check — "the suppliers set the price"
 
@@ -136,7 +146,7 @@ suffixes, then match on containment with prefixes and vowel-free abbreviations c
 hits. Materials turn on a token that names exactly one material in the workspace — which is
 why "Corrugated box - RSC" classifies and "MISC CONSUMABLES" does not.
 
-### Market bulletin — "it is assembled by hand, every fortnight"
+### Bulletin — "it is assembled by hand, every fortnight"
 
 One section per material: driver moves over the period, FX, freight, the crop read, and one
 plain line on what it means for buying. Every figure names its feed and the date of the print
@@ -147,22 +157,25 @@ thing that was approved is no longer the thing on screen.
 
 ### Running the demo
 
-`app/index.html?ws=urc#pricecheck` opens straight into the demo workspace; without the query
-string the app is the wheat desk, which is what the mill should get. The sidebar head
-switches between the two at any time.
+`app/index.html` opens on the Market screen. Four beats, about ten minutes:
 
-1. **Price check.** The board opens on *Worth a call: Kalinga Highlands* — green coffee,
-   ₱6,723/MT above the top of its fair band, ₱1.34M on the parcel offered, and a premium that
-   has widened four quarters running. Open the breakdown: two published drivers, the FX
-   conversion, the premium, and the line that proves they add to the quoted price. Then
-   **Negotiation brief** — and the table beneath it, which is every figure the brief is
-   allowed to contain. Resin is the counter-example: inside the band and under budget.
-2. **Spend.** *Load the sample export* — 1,316 lines in a few milliseconds, 1,222 classified,
-   six duplicates, and 88 lines waiting on nine decisions. The first decision is one vendor
-   spelling and clears 76 of them. The report ties to the line items and says so.
-3. **Market bulletin.** *Generate draft* — nine sections, every figure sourced, and one that
-   says it has no data rather than filling the gap. Edit a line, approve it, export it. Edit
-   it again and the export closes.
+1. **Market.** Eleven feeds, each with its twelve months and how much of the book it touches —
+   USD/PHP alone sits under all eight materials. Below, the same twelve months indexed to 100
+   so mixed units can be compared, and then the bridge: what every feed did to the *driver
+   cost* of each material, which is the floor under a price and the part no supplier sets.
+2. **Price check.** The board opens on *Worth a call: Kalinga Highlands* — green coffee above
+   the top of its fair band, with a premium that has widened four quarters running. Open the
+   breakdown: published drivers, the FX conversion, the premium, and the line proving they add
+   to the quoted price. Then **Negotiation brief**, and the table beneath it, which is every
+   figure the brief is allowed to contain. Resin is the counter-example: inside the band and
+   under budget.
+3. **Spend.** *Load the sample export* — 1,318 lines in a few milliseconds, most classified,
+   six duplicates, and the rest waiting on nine decisions. The first decision is one vendor
+   spelling and clears seventy-odd lines at once. The report ties to the line items and says
+   so on screen.
+4. **Bulletin.** *Generate draft* — nine sections, every figure sourced, and one that says it
+   has no data rather than filling the gap. Edit a line, approve it, export it. Edit it again
+   and the export closes.
 
 ### What the model does, and what it is not allowed to do
 

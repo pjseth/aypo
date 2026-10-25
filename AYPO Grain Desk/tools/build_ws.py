@@ -118,7 +118,7 @@ INSTRUMENTS = [
     ("SB",     "ICE Sugar No.11, front month",    "ICE US",     "USc/lb",  "USD", 19.85, 0.006, 0.040, "index"),
     ("FCPO",   "Bursa crude palm oil, 3rd month", "Bursa",      "MYR/MT",  "MYR", 4310.0, 0.008, 0.036, "index"),
     ("USDPHP", "USD / PHP spot",                  "BSP ref",    "PHP/USD", "PHP", 58.20, 0.004, 0.012, "fx"),
-    ("WCIMNL", "Drewry WCI Shanghai–Manila",      "Drewry",     "USD/FEU", "USD", 1482.0, -0.010, 0.060, "freight"),
+    ("FRTBOX", "Container freight, origin–Manila", "Drewry",     "USD/MT",  "USD", 62.0, -0.010, 0.060, "freight"),
 ]
 
 # Monthly indices that do not earn a place on the strip but do drive a material.
@@ -128,7 +128,6 @@ EXTRA_SERIES = [
     ("KRAFT",  "Containerboard kraftliner, Asia",   "Fastmarkets", "USD/MT",  "USD", 612.0, 0.005, 0.025),
     ("BOPP",   "BOPP film grade resin, SE Asia",    "Platts",      "USD/MT",  "USD", 1683.0, -0.003, 0.028),
     ("FRTBULK", "Supramax bulk, origin–Manila",     "Baltic",      "USD/MT",  "USD", 46.0, -0.006, 0.055),
-    ("FRTBOX", "Container, origin–Manila, per MT",  "Drewry",      "USD/MT",  "USD", 62.0, -0.010, 0.060),
 ]
 
 MATERIALS = [
@@ -800,6 +799,11 @@ def main():
 
     payload = {
         "as_of": AS_OF,
+        # The dashboard shows one book. The other workspace stays in the payload because
+        # tools/lib_tests.js uses it to assert that the generic price model reproduces the
+        # original wheat Quote Board's four-way split to the cent - a cross-check worth
+        # keeping and worth nothing on screen.
+        "ui_workspace": "urc",
         "fx": FX,
         "fx_note": "Indicative mid rates on " + AS_OF + ". Mocked for this build — no live "
                    "feed is wired up, and every screen that converts says so.",
@@ -811,7 +815,8 @@ def main():
                 "country": desk["profile"]["country"],
                 "home_currency": "USD",
                 "demo": False,
-                "blurb": "The wheat desk. Seven surfaces of the original product, unchanged.",
+                "blurb": "The original wheat desk, kept as a fixture: the price model is "
+                         "asserted against its reconstructed four-way split. Not on screen.",
                 "instruments": None,            # reads DESK.instruments
                 "materials": ufm_materials,
                 "suppliers": ufm_suppliers,

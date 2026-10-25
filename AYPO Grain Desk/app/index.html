@@ -1,7 +1,7 @@
 <meta charset="utf-8">
 <title>Grain Desk</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="A single source of truth for a flour mill's wheat buying — quotes, position, cargo and flour margin on one desk.">
+<meta name="description" content="A procurement desk for a multi-material buyer — what the market is doing, what a supplier should be charging, what we actually paid, and the fortnightly bulletin.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -13,7 +13,6 @@
 </noscript>
 
 <!-- data, generated -->
-<script src="js/data.js"></script>
 <script src="js/ws.js"></script>
 <script src="js/spend_sample.js"></script>
 <script src="js/env.js"></script>
@@ -26,14 +25,8 @@
 <script src="js/spendlib.js"></script>
 <script src="js/llm.js"></script>
 
-<!-- surfaces -->
-<script src="js/surfaces/brief.js"></script>
-<script src="js/surfaces/quotes.js"></script>
-<script src="js/surfaces/position.js"></script>
-<script src="js/surfaces/market.js"></script>
-<script src="js/surfaces/cargo.js"></script>
-<script src="js/surfaces/margin.js"></script>
-<script src="js/surfaces/savings.js"></script>
+<!-- four surfaces: what the market did, what we should pay, what we paid, what we circulate -->
+<script src="js/surfaces/prices.js"></script>
 <script src="js/surfaces/pricecheck.js"></script>
 <script src="js/surfaces/spend.js"></script>
 <script src="js/surfaces/bulletin.js"></script>

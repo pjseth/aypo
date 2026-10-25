@@ -6,8 +6,8 @@ Walks every route in every workspace and fails on:
   · a route whose expected marker text is missing from the DOM
   · common correctness smells in the rendered output (NaN, undefined, [object Object])
 
-The wheat desk is workspace `ufm` and is the default; the seven surfaces that predate
-materials are checked there, exactly as before. The three new surfaces are checked in both.
+Four surfaces, one workspace. The wheat desk lives on the v2-urc-essentials branch and is
+not loaded by this dashboard, so there is nothing to walk for it here.
 
     py -3.11 tools/test_app.py                 # every route, every workspace
     py -3.11 tools/test_app.py --shots         # also write screenshots to app/_shots
@@ -41,23 +41,17 @@ APP = ROOT / "app"
 
 # route key -> a string that must appear in the rendered DOM for that surface
 MARKERS = {
-    "brief":      "Morning brief",
-    "quotes":     "Quote board",
-    "position":   "Position book",
-    "market":     "Market",
-    "cargo":      "Cargo",
-    "margin":     "Blend",
-    "savings":    "Savings",
+    "prices":     "Market",
     "pricecheck": "Price check",
     "spend":      "Spend cleansing",
     "bulletin":   "Market bulletin",
 }
 
 # which routes each workspace serves, mirroring the `ws` field on each surface
+# One dashboard, one book. The wheat workspace is still in the payload as a fixture for
+# tools/lib_tests.js, but it has no screens and is not walked here.
 WORKSPACES = {
-    "ufm": ["brief", "quotes", "position", "market", "cargo", "margin", "savings",
-            "pricecheck", "spend", "bulletin"],
-    "urc": ["pricecheck", "spend", "bulletin"],
+    "urc": ["prices", "pricecheck", "spend", "bulletin"],
 }
 
 TRAP = """<script>
@@ -74,7 +68,6 @@ window.addEventListener('unhandledrejection', function (e) {
     return (a && a.message) ? a.message : String(a); }).join(' '));
   return ce.apply(console, arguments); }; })();
 try {
-  localStorage.setItem('graindesk-workspace', '%s');
   localStorage.removeItem('gd.spend.map.%s');
   localStorage.removeItem('gd.bulletin.last.%s');
 } catch (e) {}
@@ -123,7 +116,7 @@ def serve(directory):
 def probe_for(wskey):
     body = (APP / "index.html").read_text(encoding="utf-8")
     probe = APP / ("_probe_%s.html" % wskey)
-    probe.write_text(TRAP % (wskey, wskey, wskey) + body + STAMP, encoding="utf-8")
+    probe.write_text(TRAP % (wskey, wskey) + body + STAMP, encoding="utf-8")
     return probe
 
 

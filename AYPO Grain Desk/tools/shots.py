@@ -36,16 +36,25 @@ OUT = APP / "_shots"
 # Each scenario is a workspace, a route, and a snippet that drives the page into the state
 # worth looking at. The snippet runs after boot and has the whole of GD available.
 SCENARIOS = {
-    "ufm-quotes": ("ufm", "quotes", "", 1200),
-    "ufm-brief": ("ufm", "brief", "", 1200),
-    "ufm-pricecheck": ("ufm", "pricecheck", "", 1400),
-    "urc-pricecheck": ("urc", "pricecheck", "", 1600),
-    "urc-pricecheck-sheet": ("urc", "pricecheck", """
+    "market": ("urc", "prices", "", 2200),
+    "market-bottom": ("urc", "prices", """
+        var h = document.querySelectorAll('.card-title');
+        for (var i = 0; i < h.length; i++) {
+          if (h[i].textContent.indexOf('Twelve months') >= 0) {
+            h[i].closest('.card').scrollIntoView({ block: 'start' }); break;
+          }
+        }
+    """, 2600),
+    "market-feed": ("urc", "prices", """
+        document.querySelectorAll('.wrap .grid.g-3 > button.card')[0].click();
+    """, 3000),
+    "pricecheck": ("urc", "pricecheck", "", 2000),
+    "pricecheck-sheet": ("urc", "pricecheck", """
         var q = GD.pricing.latestPerSupplier('green_coffee', GD.ws().quotes)
           .filter(function (x) { return x.supplier_id === 'kalinga'; })[0];
         GD.showPriceCheck(q, GD.ws());
     """, 3000),
-    "urc-brief": ("urc", "pricecheck", """
+    "brief": ("urc", "pricecheck", """
         var q = GD.pricing.latestPerSupplier('green_coffee', GD.ws().quotes)
           .filter(function (x) { return x.supplier_id === 'kalinga'; })[0];
         GD.showPriceCheck(q, GD.ws());
@@ -56,21 +65,14 @@ SCENARIOS = {
           }
         }, 500);
     """, 4000),
-    "urc-spend-empty": ("urc", "spend", "", 1200),
-    "urc-spend-loaded": ("urc", "spend", """
+    "spend-empty": ("urc", "spend", "", 1600),
+    "spend-loaded": ("urc", "spend", """
         var bs = document.querySelectorAll('button');
         for (var i = 0; i < bs.length; i++) {
           if (bs[i].textContent.indexOf('Load the sample export') >= 0) { bs[i].click(); break; }
         }
     """, 3200),
-    "urc-bulletin-empty": ("urc", "bulletin", "", 1200),
-    "urc-bulletin-draft": ("urc", "bulletin", """
-        var bs = document.querySelectorAll('button');
-        for (var i = 0; i < bs.length; i++) {
-          if (bs[i].textContent.indexOf('Generate draft') >= 0) { bs[i].click(); break; }
-        }
-    """, 3200),
-    "urc-spend-review": ("urc", "spend", """
+    "spend-review": ("urc", "spend", """
         var bs = document.querySelectorAll('button');
         for (var i = 0; i < bs.length; i++) {
           if (bs[i].textContent.indexOf('Load the sample export') >= 0) { bs[i].click(); break; }
@@ -79,13 +81,12 @@ SCENARIOS = {
           var h = document.querySelectorAll('.card-title');
           for (var i = 0; i < h.length; i++) {
             if (h[i].textContent.indexOf('Review queue') >= 0) {
-              h[i].closest('.card').scrollIntoView({ block: 'start' });
-              return;
+              h[i].closest('.card').scrollIntoView({ block: 'start' }); return;
             }
           }
         }, 1400);
     """, 3600),
-    "urc-spend-report": ("urc", "spend", """
+    "spend-report": ("urc", "spend", """
         var bs = document.querySelectorAll('button');
         for (var i = 0; i < bs.length; i++) {
           if (bs[i].textContent.indexOf('Load the sample export') >= 0) { bs[i].click(); break; }
@@ -94,20 +95,23 @@ SCENARIOS = {
           var h = document.querySelectorAll('.card-title');
           for (var i = 0; i < h.length; i++) {
             if (h[i].textContent.indexOf('By material') >= 0) {
-              h[i].closest('.card').scrollIntoView({ block: 'start' });
-              return;
+              h[i].closest('.card').scrollIntoView({ block: 'start' }); return;
             }
           }
         }, 1400);
     """, 3600),
-    "urc-method": ("urc", "pricecheck", """
+    "bulletin-empty": ("urc", "bulletin", "", 1600),
+    "bulletin-draft": ("urc", "bulletin", """
+        var bs = document.querySelectorAll('button');
+        for (var i = 0; i < bs.length; i++) {
+          if (bs[i].textContent.indexOf('Generate draft') >= 0) { bs[i].click(); break; }
+        }
+    """, 3200),
+    "method": ("urc", "pricecheck", """
         var bs = document.querySelectorAll('.ph-actions button');
         for (var i = 0; i < bs.length; i++) {
           if (bs[i].textContent.indexOf('How the band is built') >= 0) { bs[i].click(); break; }
         }
-    """, 3000),
-    "urc-workspaces": ("urc", "pricecheck", """
-        document.querySelector('.side-head').click();
     """, 3000),
 }
 

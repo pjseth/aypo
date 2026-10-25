@@ -1,20 +1,22 @@
-/* Grain Desk — workspaces.
+/* Grain Desk — the workspace.
 
-   The desk started as one mill's wheat book. It now holds two customers' data, so something
-   has to say which one is on screen. That is all this file is: the active workspace, a way to
-   change it, and currency formatting for the currencies the original `fmt` did not need.
+   A workspace is one customer's book: their materials, their suppliers, their quotes, their
+   home currency. This dashboard shows exactly one of them — `WS.ui_workspace` names it — and
+   every surface reads it through `GD.ws()` rather than reaching into the payload.
 
-   The wheat desk is workspace `ufm` and it is the default. A fresh load of the app is the
-   product the flour mill already uses, with its seven surfaces and its own instruments. The
-   second workspace is additive and reached by a deliberate click.
+   The wheat desk this product started as is still in `ws.js` as a second workspace, but it is
+   not on screen and there is no switcher. It is kept because `tools/lib_tests.js` uses it to
+   assert that the generic price model reproduces, to the cent, the four-way split the
+   original Quote Board computed — a cross-check worth keeping and worth nothing on screen.
+
+   The rest of this file is currency formatting for the currencies the original `fmt` never
+   needed, and the precision rule that goes with them.
 
    Classic script, no modules. Loads after core.js and before any surface. */
 (function () {
   "use strict";
 
   var W = window.WS || { workspaces: [], fx: {} };
-  var KEY = "graindesk-workspace";
-  var listeners = [];
   var active = null;
 
   function byKey(k) {
@@ -24,46 +26,28 @@
     return null;
   }
 
-  function stored() {
-    try { return window.localStorage.getItem(KEY); } catch (e) { return null; }
-  }
-  function store(k) {
-    try { window.localStorage.setItem(KEY, k); } catch (e) { /* private mode — fine */ }
-  }
-
-  /* `?ws=urc#pricecheck` opens straight into a workspace, which is what a demo link needs:
-     the default has to stay the wheat desk for the customer who uses it every day, and a
-     bookmark is a better answer than asking the presenter to remember three clicks. */
+  /* `?ws=<key>` overrides, which is how the wheat fixture can be put on screen when somebody
+     is checking the price model against the original Quote Board. Nothing in the product
+     uses it, and there is nothing to persist: one dashboard, one book. */
   function fromQuery() {
     var m = String(location.search || "").match(/[?&]ws=([A-Za-z0-9_-]+)/);
     return m ? m[1] : null;
   }
 
-  var asked = fromQuery();
-  active = byKey(asked) || byKey(stored()) || W.workspaces[0] || null;
-  if (asked && active && active.key === asked) store(asked);
+  active = byKey(fromQuery()) || byKey(W.ui_workspace) || W.workspaces[0] || null;
 
   GD.wsAll = function () { return W.workspaces; };
   GD.wsKey = function () { return active ? active.key : null; };
   GD.ws = function () { return active; };
-  GD.wsAsOf = function () { return W.as_of || (window.DESK && window.DESK.built) || "2026-10-13"; };
+  GD.wsAsOf = function () { return W.as_of || "2026-10-13"; };
 
-  /* The wheat workspace deliberately carries no instruments of its own: its market strip is
-     DESK.instruments, the same array the Market surface reads, so the two cannot drift. */
+  /* The wheat fixture carries no instruments of its own — it borrows the original desk's,
+     which are only loaded under the test harness. On screen there is always a list. */
   GD.wsInstruments = function () {
     if (!active) return [];
     if (active.instruments) return active.instruments;
     return (window.DESK && window.DESK.instruments) || [];
   };
-
-  GD.setWs = function (k) {
-    var next = byKey(k);
-    if (!next || next === active) return;
-    active = next;
-    store(k);
-    listeners.forEach(function (fn) { fn(active); });
-  };
-  GD.onWs = function (fn) { listeners.push(fn); };
 
   /* --------------------------------------------------------------------------- lookups */
 
